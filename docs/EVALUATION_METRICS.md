@@ -1,56 +1,27 @@
-# NetGuard: Empirical Evaluation & Research Question Validation
+# NetGuardian evaluation evidence and remaining lab measurements
 
-> **Module:** Computing Project (CNT 5015)  
-> **Institution:** Cardiff Metropolitan University / ICBT Campus
+The automated evaluation in `evaluation/run_lab.py` uses synthetic traffic and a temporary SQLite database. It exercises eight scenarios three times each: normal traffic, port scan, DNS volume, traffic spike, unfamiliar destinations, combined escalation, rogue device, and benign software update. The saved run-level results are in `evaluation/results/lab-runs.csv`; `evaluation/results/lab-runs.summary.json` gives the number of expected outcomes matched. Rerun the script after changing detection logic.
 
----
+```bash
+python evaluation/run_lab.py --output evaluation/results/lab-runs.csv --repetitions 3
+```
 
-## 1. Quantitative Performance Summary
+The recorded `processing_elapsed_ms` includes local scenario generation and evaluation. It is **not** packet-capture latency or network isolation latency. A simulated quarantine flag and ACL preview do **not** prove that a real device lost network access. The 24 synthetic checks cannot establish a field detection-accuracy or false-positive percentage for small networks.
 
-Across 32 controlled test cycles conducted on the dedicated lab testbed:
+## Proposal research questions
 
-| Metric | Measured Value | Standard Target | Assessment |
-| :--- | :---: | :---: | :---: |
-| **Detection Accuracy** | **96.8%** | $\ge 90\%$ | Excellent |
-| **False Positive Rate (FPR)** | **3.1%** | $\le 5\%$ | Optimal |
-| **Precision** | **96.9%** | $\ge 90\%$ | Robust |
-| **Recall / Sensitivity** | **96.8%** | $\ge 90\%$ | Robust |
-| **Mean Response Latency** | **4.2 seconds** | $\le 30$ seconds | Real-time |
-| **Containment Enforcement Rate** | **100.0%** | $100\%$ | Zero Bypass |
+### RQ1 Per-device behavioural baseline
 
-### Confusion Matrix
-| Actual \ Predicted | Flagged Elevated / Critical | Flagged Normal |
-| :--- | :---: | :---: |
-| **Actual Anomaly / Attack ($N=32$)** | **31 (True Positive)** | **1 (False Negative)** |
-| **Actual Benign Activity ($N=32$)** | **1 (False Positive)** | **31 (True Negative)** |
+Record the lab topology, monitor interface, IP subnet, and how the monitoring laptop can observe each client. Capture normal traffic from each device for at least 20 clean intervals. Keep the traffic sample and baseline history so the source of each learned value can be checked. Compare learned DNS count, distinct destination count, port count, and bytes per interval with the device's later observed activity.
 
-$$\text{Accuracy} = \frac{TP + TN}{TP + TN + FP + FN} = \frac{31 + 31}{64} = 96.88\%$$
-$$\text{False Positive Rate} = \frac{FP}{FP + TN} = \frac{1}{1 + 31} = 3.12\%$$
+### RQ2 Risk scoring and false positives
 
----
+Repeat each proposal scenario at least three times on the authorized lab network. For every run, record the expected indicator, observed indicator, risk score, alert outcome, and whether the action was justified. Include benign software updates and other legitimate bursts. Define true positive, false positive, true negative, and false negative before calculating accuracy, precision, recall, or false-positive rate.
 
-## 2. Validation of Research Questions
+### RQ3 Alert-only versus automatic quarantine
 
-### Research Question 1 (RQ1)
-> *"How can passive traffic metadata be leveraged in building a robust per-device behavior baseline in a month-long development period?"*
+Run the same controlled scenario under both policies. Measure timestamps from the first observed anomalous packet to the alert, the enforcement command, and an independent connectivity check from the affected client. A Windows or macOS host firewall rule protects the monitoring laptop's traffic to that IP; it does not by itself isolate the client from the router or the rest of the LAN. For whole-network isolation, place enforcement at the gateway or use an authorized router/VLAN mechanism. If that topology is unavailable, demonstrate a clearly labelled simulated quarantine as the proposal permits.
 
-- **Methodology:** Device profiles were populated using purely non-invasive L3/L4 header extraction (MAC, IP, TCP/UDP destination ports, DNS query counts, and byte transfer totals). No deep packet inspection (DPI) or SSL/TLS decryption was required.
-- **Finding:** A rolling statistical model tracking these 4 parameters converged to a reliable behavioral baseline within 15 to 20 minutes of idle/normal activity. Hardware categories (Printers, CCTV cameras, Phones, Laptops) produced distinct, separable baseline signatures.
+## Run record for live lab tests
 
----
-
-### Research Question 2 (RQ2)
-> *"Which combination of behavioral attributes (port scans, DNS anomalies, traffic amount, newly accessed locations, connectivity frequency) yields the most robust risk score with the minimum number of false positives for a small network?"*
-
-- **Methodology:** Tested single-indicator triggers vs multi-indicator combinations against both hostile traffic (SYN port scans, DNS tunneling, exfiltration bursts) and benign fluctuations (OS updates, media streaming).
-- **Finding:** A weighted scoring model assigning higher weights to deliberate reconnaissance (+30 Port Scan) and evasion (+20 DNS Anomaly) combined with moderate weights for volume spikes (+15) and foreign IP connections (+15) proved superior. High-volume benign updates generated only 15 points (remaining in the Low-Risk band), completely avoiding false-positive quarantines.
-
----
-
-### Research Question 3 (RQ3)
-> *"How do the effects of an automated quarantine response, which is activated through thresholds, compare to the effects of alerts to administrators alone?"*
-
-- **Methodology:** Measured elapsed time from malicious activity onset until network isolation under two policies:
-  1. *Alerts-Only Policy:* Human administrator notification via email/dashboard.
-  2. *NetGuard Automated Quarantine Policy:* Threshold-driven active isolation.
-- **Finding:** In unmanaged environments without round-the-clock administrators, human response latency averaged between 22 and 45 minutes, permitting complete lateral subnet enumeration. NetGuard's automated quarantine isolated the hostile endpoint within **4.2 seconds**, reducing the attack window by over 99.8%.
+For each repetition capture: scenario ID, device MAC/IP, topology and monitor interface, expected result, observed indicator and score, first anomaly timestamp, alert timestamp, enforcement timestamp, independent connectivity result, false-positive decision, and screenshot/log reference. Preserve the raw records alongside the final report so every reported figure can be recalculated.

@@ -43,7 +43,7 @@ async function runDemoStep(stepNumber) {
         logConsole(`>> New Risk Score: ${stepInfo.new_risk_score}/100 [Status: ${stepInfo.status}]`, riskColor);
       }
       if (stepInfo.is_quarantined) {
-        logConsole(`>> [ALERT] Automated Quarantine ACTIVATED: Host isolated from network segment!`, 'critical');
+        logConsole(`>> [ALERT] Simulated quarantine recorded. No physical network rule was applied.`, 'critical');
       }
 
       showToast(`Phase ${stepNumber} Executed: ${stepInfo.title}`, 'success');

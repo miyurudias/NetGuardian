@@ -18,7 +18,7 @@ Small networks in cafes, tutorial centers, hostels, schools, and small branch of
 **NetGuard** solves this problem by shifting from packet-payload signatures and complex, unaffordable enterprise machine learning to **empirical per-device behavioral baselining**:
 $$\text{Behaviour Drift} = \text{Current Behaviour} - \text{Historical Normal Behaviour}$$
 
-When a host exhibits anomalous behavioral drift exceeding defined weighted risk thresholds, NetGuard issues real-time administrator alerts and automatically enforces isolation (via router ACL scripts, Linux iptables, macOS pfctl, or Windows firewall).
+NetGuard calculates behaviour drift for review and separately assigns a weighted risk score from five anomaly indicators. It raises alerts and, at the configured threshold, records a simulated quarantine policy by default. Optional host-firewall backends require a separately validated lab setup.
 
 ---
 
@@ -26,7 +26,7 @@ When a host exhibits anomalous behavioral drift exceeding defined weighted risk 
 
 1. **Passive Traffic Metadata Capture (Dual-Mode)**:
    - **Lab / Simulated Mode (Default)**: Ingests synthetic network traffic for the 5 canonical devices without requiring root privileges or risk of interrupting local network connectivity. Works on **Windows, macOS, and Linux**.
-   - **Live Mode**: Uses Scapy to passively sniff raw L3/L4 packet headers (MAC, IP, TCP/UDP ports, DNS queries, transfer volumes) on a designated interface.
+   - **Live Mode**: Uses Scapy to passively sniff packet metadata on a designated interface. On Windows, packet capture needs a working Npcap setup and sufficient privileges. A normal switched Wi-Fi laptop sees only traffic available to its interface; full-LAN monitoring needs an appropriate network position.
 2. **Per-Device Empirical Baselining**:
    - Maintains historical moving averages across 4 behavioral dimensions:
      - DNS queries per interval
@@ -43,17 +43,17 @@ When a host exhibits anomalous behavioral drift exceeding defined weighted risk 
    - Unfamiliar destination connection: **+15 points**
    - **Risk Bands**: Low (0–39: Green), Medium (40–69: Amber / Suspicious), High (70–100: Red / Critical).
 5. **Automated & Manual Multi-Backend Quarantine**:
-   - **Simulated Cisco / Mikrotik ACL**: Formats real router access-lists for classroom demonstrations.
-   - **Windows Firewall**: `netsh advfirewall` execution.
-   - **Linux Firewall**: `iptables` / `nftables` forwarding drop rules.
-   - **macOS Packet Filter**: `pfctl` quarantine table entries.
+   - **Simulated Cisco ACL**: Generates a policy preview for classroom demonstrations; no router rule is applied.
+   - **Windows Firewall**: `netsh advfirewall` rule on the monitoring host only.
+   - **Linux Firewall**: `iptables` FORWARD rule, useful only when the machine is forwarding the affected traffic.
+   - **macOS Packet Filter**: `pfctl` table entry, requiring a configured PF rule that references the table.
    - Whitelist protection prevents critical infrastructure from being isolated.
 6. **Polished Dark-Mode Web Dashboard**:
    - Real-time Threat Gauge & KPI cards.
    - Searchable device inventory table with live status badges.
    - Device deep-dive profile with Chart.js Radar chart comparing baseline vs current activity.
    - Interactive Live Demo Lab with 1-click viva presentation controls.
-   - Academic evaluation and metrics export (PDF/Print view answering RQ1, RQ2, RQ3).
+   - Reproducible synthetic evaluation CSV and a printable evidence page at `/reports`. Live-lab accuracy and isolation timing still need measurement.
 
 ---
 
@@ -93,9 +93,15 @@ python run.py
 ```
 
 Then open your browser and navigate to:
-👉 **[http://localhost:5000](http://localhost:5000)**
+👉 **[http://localhost:5050](http://localhost:5050)**
 
 *(Optional flags: `python run.py --port 8080`, `python run.py --live`)*
+
+### Live capture on the Windows demonstration laptop
+
+Install Npcap and run NetGuard with permission to capture on the selected interface. Set **Capture mode** to `LIVE` in Settings, then use **Restart NetGuard** on that page. Confirm `/api/mode/status` reports `capture.ready: true` before switching to **Live LAN**. The restart button is available when the application was launched with `python run.py`. `python run.py --live` requests live capture at startup; later UI restarts use the saved capture setting. Set `NETGUARD_IFACE` if automatic interface selection chooses the wrong adapter. On macOS, use the same mode and interface check with a permitted capture interface.
+
+Live capture is only as complete as the traffic visible to that interface. A normal Windows or macOS laptop on switched Wi-Fi cannot observe every other client's unicast traffic. Use a monitored gateway, bridge, or mirrored port for a full-LAN claim. The default `SIMULATED` containment backend is appropriate when the lab has no gateway enforcement mechanism. Windows and macOS host firewall backends affect the monitoring laptop's traffic; they do not disconnect a different client from the router.
 
 ---
 
@@ -105,7 +111,7 @@ NetGuard includes a dedicated **Live Demo Lab** (`/simulation`) with a 4-phase s
 
 1. **Phase 1 (Normal Baseline)**: Populates all 5 canonical devices (Laptop 01, Phone 01, Printer, Laptop 02, CCTV). All devices display **LOW** risk (Green).
 2. **Phase 2 (Port Scan Attack)**: Initiates a port scan from Laptop 02. The dashboard updates in real time, elevating Laptop 02 to **SUSPICIOUS** (Amber, score ~40–50).
-3. **Phase 3 (Escalate & Isolate)**: Injects DNS tunneling and suspicious C2 destinations. Risk score crosses the critical threshold ($\ge 70$), and NetGuard enforces **AUTOMATIC QUARANTINE**! The host is blocked, and router ACL commands are generated.
+3. **Phase 3 (Escalate & Contain)**: Injects several synthetic anomaly indicators. Risk crosses the critical threshold, NetGuard marks the lab device quarantined, and an ACL policy preview is generated. No physical client is blocked in the default demo.
 4. **Phase 4 (Admin Unblock)**: Demonstrates the administrator review workflow and one-click unblock to restore normal access.
 
 *For speaking points and script for the 3 students, see [docs/VIVA_DEMO_GUIDE.md](docs/VIVA_DEMO_GUIDE.md).*
@@ -134,7 +140,6 @@ NetGuard/
 ├── core/                       # Core Networking & Detection Engines
 │   ├── device_profiler.py      # Device discovery and hardware categorization
 │   ├── capture_engine.py       # Dual-mode traffic sniffer & interval evaluator
-│   ├── baseline_engine.py      # Rolling averages and baseline builder
 │   ├── drift_engine.py         # Behaviour Drift Score mathematical calculator
 │   ├── risk_engine.py          # Anomaly indicator evaluation and risk scoring
 │   └── quarantine_manager.py   # Multi-backend quarantine controller
@@ -164,15 +169,22 @@ NetGuard/
 │   └── settings.html           # Indicator weights and threshold tuning
 │
 ├── tests/                      # Automated Verification Test Suite
+│   ├── test_baseline.py        # New-device learning and baseline locking
 │   ├── test_drift.py           # Mathematical drift model tests
 │   ├── test_risk.py            # Weighted risk scoring tests
 │   ├── test_quarantine.py      # Isolation and whitelist tests
+│   ├── test_network_info.py    # Windows adapter and subnet parsing
+│   ├── test_schema_migration.py # Existing database migration
 │   └── test_api.py             # Web API endpoint tests
+│
+├── evaluation/                # Synthetic run generator, saved results, live-run template
+│   └── run_lab.py              # Isolated repeatable scenario evaluation
 │
 └── docs/                       # Academic Documentation Kit
     ├── ARCHITECTURE.md         # Full dissertation technical writeup
     ├── VIVA_DEMO_GUIDE.md      # Script and spoken dialogue for the 3 students
-    └── EVALUATION_METRICS.md   # Empirical findings for RQ1, RQ2, and RQ3
+    ├── EVALUATION_METRICS.md   # Evidence boundary and measurement protocol
+    └── LIVE_LAB_GUIDE.md      # Windows/macOS validation steps
 ```
 
 ---

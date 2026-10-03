@@ -110,6 +110,22 @@ class TestRiskEngine(unittest.TestCase):
         self.assertGreaterEqual(total_risk, 70)
         self.assertGreaterEqual(len(rules), 3)
 
+    def test_unfamiliar_destinations_compare_addresses_not_just_count(self):
+        laptop2 = DeviceModel.get_by_mac("00:1A:2B:3C:4D:04")
+        baseline = BaselineModel.get_by_device(laptop2["id"])
+        sample = {
+            "dns_count": 0, "port_count": 1, "bytes_transferred_kb": 20,
+            "distinct_ips_count": 3,
+            "dest_ips": ["198.51.100.1", "198.51.100.2", "198.51.100.3"]
+        }
+        score, _, _, rules, sub_scores = evaluate_device_risk(laptop2, sample, baseline)
+        self.assertEqual(sub_scores["unfamiliar_dest"], 15)
+        self.assertTrue(any(r["indicator"] == "Unfamiliar External Destinations" for r in rules))
+
+        sample["dest_ips"] = baseline["known_dest_ips"][:3]
+        _, _, _, _, known_scores = evaluate_device_risk(laptop2, sample, baseline)
+        self.assertEqual(known_scores["unfamiliar_dest"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -7,20 +7,29 @@ quarantine management, and live viva demonstration API.
 import os
 import sys
 import ipaddress
+import csv
+import json
+import re
+import secrets
+import threading
+import time
 from pathlib import Path
 
 # Ensure NetGuard directory is in sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for
-from database.db import init_db, reset_db
+from flask import Flask, render_template, request, jsonify, redirect, url_for, send_file
+from database.db import init_db
 from database.models import (
     DeviceModel, BaselineModel, TrafficModel, RiskModel,
     AlertModel, QuarantineLogModel, ConfigModel
 )
 from database.seed_data import seed_database
 from core.quarantine_manager import quarantine_device, release_device
-from core.capture_engine import start_capture_engine, process_interval_evaluations
+from core.capture_engine import (
+    start_capture_engine, process_interval_evaluations, live_capture_status,
+    set_operating_mode, set_local_network
+)
 from simulator.normal_traffic import start_normal_traffic_simulation
 from simulator.attack_scenarios import (
     run_port_scan_attack, run_dns_tunneling_attack, run_traffic_spike_attack,
@@ -39,6 +48,7 @@ import config
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("NETGUARD_SECRET", "netguard-cnt5015-secret-key-2026")
+BOOT_ID = secrets.token_hex(8)
 
 
 def _authorised_network_action(data):
@@ -54,6 +64,12 @@ def _validate_local_target(ip):
         target = ipaddress.ip_address(ip.strip())
         if target.version != 4:
             return False, "Only IPv4 addresses are supported."
+        network_info = get_active_network_info()
+        if network_info["host_ip"] == "127.0.0.1":
+            return False, "No active IPv4 network interface was detected."
+        subnet = ipaddress.ip_network(network_info["subnet"], strict=False)
+        if target not in subnet:
+            return False, f"Target must be on the detected local subnet ({subnet})."
         return True, None
     except ValueError:
         return False, "A valid IPv4 address is required."
@@ -66,6 +82,11 @@ def _validate_local_target(ip):
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/favicon.ico")
+def favicon():
+    return redirect(url_for("static", filename="favicon.svg"))
 
 
 @app.route("/devices")
@@ -103,7 +124,23 @@ def simulation_page():
 
 @app.route("/reports")
 def reports_page():
-    return redirect(url_for("academic_page"))
+    results_path = Path(__file__).resolve().parent / "evaluation" / "results" / "lab-runs.csv"
+    summary_path = results_path.with_suffix(".summary.json")
+    runs = []
+    summary = None
+    if results_path.is_file() and summary_path.is_file():
+        with results_path.open(newline="", encoding="utf-8") as handle:
+            runs = list(csv.DictReader(handle))
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    return render_template("reports.html", runs=runs, summary=summary)
+
+
+@app.route("/reports/runs.csv")
+def download_lab_runs():
+    results_path = Path(__file__).resolve().parent / "evaluation" / "results" / "lab-runs.csv"
+    if not results_path.is_file():
+        return jsonify({"status": "error", "message": "Run the lab evaluation first."}), 404
+    return send_file(results_path, mimetype="text/csv", as_attachment=True, download_name="netguardian-lab-runs.csv")
 
 
 @app.route("/settings")
@@ -146,7 +183,7 @@ def api_quarantine_device(device_id):
     return jsonify({
         "status": "success" if success else "error",
         "message": message
-    })
+    }), (200 if success else 409)
 
 
 @app.route("/api/devices/<int:device_id>/release", methods=["POST"])
@@ -155,7 +192,7 @@ def api_release_device(device_id):
     return jsonify({
         "status": "success" if success else "error",
         "message": message
-    })
+    }), (200 if success else 409)
 
 
 @app.route("/api/devices/<int:device_id>/whitelist", methods=["POST"])
@@ -229,6 +266,8 @@ def api_stats_overview():
 
 @app.route("/api/simulation/step/<int:step_num>", methods=["POST"])
 def api_demo_step(step_num):
+    if ConfigModel.get("operating_mode", "LAB_SIMULATION") != "LAB_SIMULATION" or ConfigModel.get("quarantine_backend", config.QUARANTINE_BACKEND) != "SIMULATED":
+        return jsonify({"status": "error", "message": "Demo steps require lab mode and simulated containment."}), 409
     if step_num == 1:
         result = demo_step_1_baseline()
     elif step_num == 2:
@@ -245,6 +284,8 @@ def api_demo_step(step_num):
 
 @app.route("/api/simulation/attack", methods=["POST"])
 def api_trigger_attack():
+    if ConfigModel.get("operating_mode", "LAB_SIMULATION") != "LAB_SIMULATION" or ConfigModel.get("quarantine_backend", config.QUARANTINE_BACKEND) != "SIMULATED":
+        return jsonify({"status": "error", "message": "Synthetic scenarios require lab mode and simulated containment."}), 409
     data = request.get_json() or {}
     attack_type = data.get("type", "port_scan").lower()
 
@@ -273,7 +314,11 @@ def api_trigger_attack():
 
 @app.route("/api/simulation/reset", methods=["POST"])
 def api_reset_simulation():
-    seed_database(clean=True)
+    if ConfigModel.get("operating_mode", "LAB_SIMULATION") != "LAB_SIMULATION" or ConfigModel.get("quarantine_backend", config.QUARANTINE_BACKEND) != "SIMULATED":
+        return jsonify({"status": "error", "message": "Demo reset requires lab mode and simulated containment."}), 409
+    seed_database(clean=True, capture_mode_override=live_capture_status()["runtime_mode"])
+    set_operating_mode("LAB_SIMULATION")
+    set_local_network(config.LOCAL_SUBNET)
     process_interval_evaluations()
     return jsonify({"status": "success", "message": "Database and baselines reset to clean normal state."})
 
@@ -288,6 +333,38 @@ def api_network_info():
     return jsonify({"status": "success", "info": info})
 
 
+@app.route("/api/mode/status", methods=["GET"])
+def api_mode_status():
+    capture = live_capture_status()
+    configured_mode = ConfigModel.get("capture_mode", config.CAPTURE_MODE)
+    return jsonify({
+        "status": "success",
+        "operating_mode": ConfigModel.get("operating_mode", "LAB_SIMULATION"),
+        "capture_mode": configured_mode,
+        "capture": capture,
+        "quarantine_backend": ConfigModel.get("quarantine_backend", config.QUARANTINE_BACKEND),
+        "restart_required": configured_mode != capture["runtime_mode"],
+        "restart_available": os.environ.get("NETGUARD_SUPERVISED") == "1",
+        "boot_id": BOOT_ID
+    })
+
+
+@app.route("/api/system/restart", methods=["POST"])
+def api_system_restart():
+    """Ask the cross-platform launcher to replace this server after replying."""
+    if os.environ.get("NETGUARD_SUPERVISED") != "1":
+        return jsonify({"status": "error", "message": "Start NetGuard with run.py to use the restart control."}), 409
+    if not _authorised_network_action(request.get_json(silent=True) or {}):
+        return jsonify({"status": "error", "message": "Restart confirmation is required."}), 403
+
+    def exit_after_response():
+        time.sleep(0.75)
+        os._exit(config.RESTART_EXIT_CODE)
+
+    threading.Thread(target=exit_after_response, daemon=True).start()
+    return jsonify({"status": "success", "message": "NetGuard is restarting.", "boot_id": BOOT_ID})
+
+
 @app.route("/api/network/scan", methods=["POST"])
 def api_network_scan():
     """Runs a real multi-threaded sweep of the local physical LAN."""
@@ -295,7 +372,7 @@ def api_network_scan():
     if not _authorised_network_action(data):
         return jsonify({"status": "error", "message": "Explicit network authorisation is required before starting an active scan."}), 403
     scan_res = scan_local_lan()
-    return jsonify(scan_res)
+    return jsonify(scan_res), (200 if scan_res["status"] == "success" else 409)
 
 
 @app.route("/api/network/probe", methods=["POST"])
@@ -311,6 +388,8 @@ def api_network_probe():
     is_local, message = _validate_local_target(ip)
     if not is_local:
         return jsonify({"status": "error", "message": message}), 400
+    if auto_import and (ConfigModel.get("operating_mode", "LAB_SIMULATION") != "LIVE_LAN" or not live_capture_status()["ready"]):
+        return jsonify({"status": "error", "message": "Switch to a working Live LAN capture before importing a probed host."}), 409
 
     device_data = probe_single_device(ip)
     imported_id = None
@@ -318,7 +397,6 @@ def api_network_probe():
         imported_ids = import_real_devices_to_inventory([device_data])
         if imported_ids:
             imported_id = imported_ids[0]
-            ConfigModel.set("operating_mode", "LIVE_LAN")
 
     return jsonify({
         "status": "success",
@@ -332,13 +410,35 @@ def api_network_import():
     """Imports discovered physical devices into NetGuard's active inventory."""
     data = request.get_json() or {}
     devices = data.get("devices", [])
+    if not _authorised_network_action(data):
+        return jsonify({"status": "error", "message": "Explicit network authorisation is required before importing hosts."}), 403
+    if ConfigModel.get("capture_mode", config.CAPTURE_MODE) != "LIVE" or not live_capture_status()["ready"]:
+        return jsonify({"status": "error", "message": "Live capture must be running before importing hosts for monitoring."}), 409
+    if any(d["is_quarantined"] for d in DeviceModel.get_all()):
+        return jsonify({"status": "error", "message": "Release quarantined hosts before replacing the active inventory."}), 409
     if not devices:
         return jsonify({"status": "error", "message": "No devices to import"}), 400
+    subnet = ipaddress.ip_network(get_active_network_info()["subnet"], strict=False)
+    network_info = get_active_network_info()
+    gateway_ip = network_info["gateway_ip"]
+    try:
+        for device in devices:
+            if ipaddress.ip_address(device["ip"]) not in subnet:
+                raise ValueError("Imported devices must be on the detected local subnet.")
+            if not all(key in device for key in ("mac", "name", "device_type")):
+                raise ValueError("An imported device is missing required identity fields.")
+            if not re.fullmatch(r"(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}", device["mac"]):
+                raise ValueError("An imported device has an invalid MAC address.")
+            device["is_gateway"] = device["ip"] == gateway_ip
+            device["is_localhost"] = device["ip"] == network_info["host_ip"]
+    except (KeyError, TypeError, ValueError) as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 400
 
-    # Clean out any previous mock/dummy data so only the fresh physical scan is active
-    DeviceModel.clear_all_devices()
+    DeviceModel.clear_mock_devices()
     imported_ids = import_real_devices_to_inventory(devices)
     ConfigModel.set("operating_mode", "LIVE_LAN")
+    set_local_network(get_active_network_info()["subnet"])
+    set_operating_mode("LIVE_LAN")
     return jsonify({
         "status": "success",
         "imported_count": len(imported_ids),
@@ -384,15 +484,25 @@ def api_mode_switch():
     data = request.get_json() or {}
     target_mode = data.get("mode", "LAB_SIMULATION").upper()
 
+    if target_mode not in {"LIVE_LAN", "LAB_SIMULATION"}:
+        return jsonify({"status": "error", "message": "Unsupported operating mode."}), 400
+    if any(d["is_quarantined"] for d in DeviceModel.get_all()):
+        return jsonify({"status": "error", "message": "Release quarantined hosts before switching modes."}), 409
+
     if target_mode == "LIVE_LAN":
         if not _authorised_network_action(data):
             return jsonify({"status": "error", "message": "Explicit network authorisation is required before switching to Live LAN."}), 403
-        # Clear mock demo devices so only REAL physical LAN devices are actively monitored
-        reset_db()
+        if ConfigModel.get("capture_mode", config.CAPTURE_MODE) != "LIVE" or not live_capture_status()["ready"]:
+            return jsonify({"status": "error", "message": "Set capture mode to LIVE, restart NetGuard, and confirm the capture interface is working before switching."}), 409
         scan_res = scan_local_lan()
+        if scan_res["status"] != "success":
+            return jsonify(scan_res), 409
+        DeviceModel.clear_mock_devices()
         imported = import_real_devices_to_inventory(scan_res.get("devices", []))
         ConfigModel.set("operating_mode", "LIVE_LAN")
         net_info = scan_res.get("network_info", {})
+        set_local_network(net_info["subnet"])
+        set_operating_mode("LIVE_LAN")
         return jsonify({
             "status": "success",
             "mode": "LIVE_LAN",
@@ -401,12 +511,17 @@ def api_mode_switch():
         })
     else:
         # Load canonical 5 demo devices for viva examination
-        seed_database(clean=True)
+        if not _authorised_network_action(data):
+            return jsonify({"status": "error", "message": "Confirm that the current inventory and history may be cleared before loading the demo lab."}), 403
+        seed_database(clean=True, capture_mode_override="SIMULATED")
         ConfigModel.set("operating_mode", "LAB_SIMULATION")
+        set_local_network(config.LOCAL_SUBNET)
+        set_operating_mode("LAB_SIMULATION")
         return jsonify({
             "status": "success",
             "mode": "LAB_SIMULATION",
-            "message": "Switched to Academic Demonstration Lab. Loaded 5 canonical baseline endpoints."
+            "restart_required": live_capture_status()["runtime_mode"] != "SIMULATED",
+            "message": "Academic Demo Lab loaded and capture set to Simulated. Restart NetGuard to apply the capture setting."
         })
 
 
@@ -454,10 +569,19 @@ def api_settings():
         return jsonify({"status": "error", "message": "Unsupported quarantine backend."}), 400
     if capture_mode not in {"SIMULATED", "LIVE"}:
         return jsonify({"status": "error", "message": "Unsupported capture mode."}), 400
+    if capture_mode == "LIVE" and not _authorised_network_action(data):
+        return jsonify({"status": "error", "message": "Confirm authorisation before enabling live packet capture."}), 403
+    if capture_mode != "LIVE" and ConfigModel.get("operating_mode", "LAB_SIMULATION") == "LIVE_LAN":
+        return jsonify({"status": "error", "message": "Switch to the demonstration lab before disabling live capture."}), 409
     if auto_quarantine not in {"true", "false"}:
         return jsonify({"status": "error", "message": "Auto-quarantine must be true or false."}), 400
     if backend != "SIMULATED" and not _authorised_network_action(data):
         return jsonify({"status": "error", "message": "Confirm authorisation before enabling a live firewall backend."}), 403
+    if backend != "SIMULATED" and ConfigModel.get("operating_mode", "LAB_SIMULATION") != "LIVE_LAN":
+        return jsonify({"status": "error", "message": "Live firewall backends require Live LAN mode."}), 409
+    current_backend = ConfigModel.get("quarantine_backend", config.QUARANTINE_BACKEND)
+    if backend != current_backend and any(d["is_quarantined"] for d in DeviceModel.get_all()):
+        return jsonify({"status": "error", "message": "Release quarantined hosts before changing the enforcement backend."}), 409
 
     for key, value in weights.items():
         ConfigModel.set(key, value)
@@ -465,10 +589,11 @@ def api_settings():
     ConfigModel.set("quarantine_backend", backend)
     ConfigModel.set("capture_mode", capture_mode)
     ConfigModel.set("auto_quarantine", auto_quarantine)
+    restart_required = capture_mode != live_capture_status()["runtime_mode"]
     return jsonify({
         "status": "success",
-        "message": "Configuration saved. Restart NetGuard to apply a changed capture mode.",
-        "restart_required": capture_mode != config.CAPTURE_MODE
+        "message": "Configuration saved. Restart NetGuard to apply the capture mode." if restart_required else "Configuration saved.",
+        "restart_required": restart_required
     })
 
 
@@ -480,21 +605,24 @@ def start_server():
     """Initializes DB, starts traffic engines, and launches Flask server."""
     # Ensure a fresh installation has the SQLite schema before querying inventory.
     init_db()
+    if os.environ.get("NETGUARD_MODE", "").upper() == "LIVE":
+        ConfigModel.set("capture_mode", "LIVE")
+    if ConfigModel.get("operating_mode", "LAB_SIMULATION") == "LAB_SIMULATION":
+        seed_database(clean=False, capture_mode_override=ConfigModel.get("capture_mode", config.CAPTURE_MODE))
 
     # Start background ingestion engine
     start_capture_engine()
 
-    # If in simulated mode, start background benign traffic
+    # The generator is always available but emits only in the lab mode.
     mode = ConfigModel.get("capture_mode", config.CAPTURE_MODE)
-    if mode == "SIMULATED":
-        start_normal_traffic_simulation(interval_seconds=config.CAPTURE_SAMPLE_INTERVAL_SECONDS)
+    start_normal_traffic_simulation(interval_seconds=config.CAPTURE_SAMPLE_INTERVAL_SECONDS)
 
     print(f"\n=======================================================")
     print(f"   NetGuard Behavioural Security Platform (CNT 5015)   ")
     print(f"=======================================================")
     print(f"[*] Dashboard URL : http://{config.HOST}:{config.PORT}")
     print(f"[*] Traffic Mode  : {mode}")
-    print(f"[*] Quarantine    : {config.QUARANTINE_BACKEND}")
+    print(f"[*] Quarantine    : {ConfigModel.get('quarantine_backend', config.QUARANTINE_BACKEND)}")
     print(f"[*] Press CTRL+C to stop the platform.")
     print(f"=======================================================\n")
 

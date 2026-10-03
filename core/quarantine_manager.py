@@ -5,7 +5,6 @@ and Simulated Enterprise Router (Cisco / Mikrotik ACL) environments.
 (Section 8.4 of Computing Project Proposal)
 """
 
-import sys
 import platform
 import subprocess
 from database.models import DeviceModel, QuarantineLogModel, AlertModel, ConfigModel
@@ -40,7 +39,6 @@ def execute_system_isolation(device, backend, action="BLOCK"):
     """
     ip = device["ip"]
     mac = device["mac"]
-    dev_name = device["name"]
     command_executed = ""
     command_succeeded = True
     os_name = platform.system().lower()
@@ -66,6 +64,13 @@ def execute_system_isolation(device, backend, action="BLOCK"):
                     capture_output=True, text=True, check=False
                 )
                 command_succeeded = result_in.returncode == 0 and result_out.returncode == 0
+                if not command_succeeded:
+                    for name, result in ((rule_in, result_in), (rule_out, result_out)):
+                        if result.returncode == 0:
+                            subprocess.run(
+                                ["netsh", "advfirewall", "firewall", "delete", "rule", f"name={name}"],
+                                capture_output=True, check=False
+                            )
             except Exception as e:
                 command_succeeded = False
                 command_executed += f" (OS call error: {e})"
@@ -135,6 +140,8 @@ def quarantine_device(device_id, reason, manual=False):
         return False, f"Device {device['name']} is Whitelisted. Quarantine aborted."
 
     backend = ConfigModel.get("quarantine_backend", config.QUARANTINE_BACKEND)
+    if backend != "SIMULATED" and ConfigModel.get("operating_mode", "LAB_SIMULATION") != "LIVE_LAN":
+        return False, "Live firewall enforcement is unavailable in the demonstration lab."
     cmd, command_succeeded = execute_system_isolation(device, backend, action="BLOCK")
 
     if not command_succeeded:
@@ -145,7 +152,7 @@ def quarantine_device(device_id, reason, manual=False):
             command=cmd,
             reason=reason
         )
-        AlertModel.create(
+        AlertModel.create_or_update_active(
             device_id=device_id,
             severity="Critical",
             indicator="Quarantine Enforcement Failed",
@@ -167,16 +174,20 @@ def quarantine_device(device_id, reason, manual=False):
     )
 
     # Create Critical Incident Alert
+    simulated = backend == "SIMULATED"
     AlertModel.create(
         device_id=device_id,
         severity="Critical",
-        indicator="Device Quarantined",
-        message=f"[QUARANTINE ACTIVE] Device {device['name']} ({device['ip']}) has been isolated: {reason}",
+        indicator="Simulated Quarantine" if simulated else "Host Firewall Rule Added",
+        message=(f"[POLICY PREVIEW] Device {device['name']} ({device['ip']}) marked quarantined in the lab: {reason}"
+                 if simulated else f"[HOST FIREWALL] Rule added for {device['name']} ({device['ip']}): {reason}"),
         drift_pct=device.get("current_drift_score", 0),
         risk_score=device.get("current_risk_score", 0)
     )
 
-    return True, f"Device {device['name']} ({device['ip']}) successfully quarantined via {backend}."
+    if simulated:
+        return True, f"Device {device['name']} marked quarantined in the simulated lab; no network rule was applied."
+    return True, f"Host firewall rule added for {device['name']} ({device['ip']}) via {backend}."
 
 
 def release_device(device_id, admin_reason="Administrator manual unblock"):
@@ -187,6 +198,8 @@ def release_device(device_id, admin_reason="Administrator manual unblock"):
     device = DeviceModel.get_by_id(device_id)
     if not device:
         return False, "Device not found."
+    if not device.get("is_quarantined"):
+        return False, "Device is not currently quarantined."
 
     backend = ConfigModel.get("quarantine_backend", config.QUARANTINE_BACKEND)
     cmd, command_succeeded = execute_system_isolation(device, backend, action="RELEASE")
@@ -204,6 +217,7 @@ def release_device(device_id, admin_reason="Administrator manual unblock"):
     # Update database state
     DeviceModel.set_quarantined(device_id, is_quarantined=False, reason=None)
     DeviceModel.update_scores(device_id, risk_score=0, drift_score=0.0, status="Normal")
+    AlertModel.resolve_all(device_id)
 
     QuarantineLogModel.log(
         device_id=device_id,
@@ -221,5 +235,6 @@ def release_device(device_id, admin_reason="Administrator manual unblock"):
         drift_pct=0.0,
         risk_score=0
     )
+    AlertModel.resolve_all(device_id)
 
     return True, f"Device {device['name']} released from quarantine."

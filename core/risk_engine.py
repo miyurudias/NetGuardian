@@ -4,7 +4,7 @@ Calculates device risk score based on behavioral anomaly indicators.
 (Section 8.3 of Computing Project Proposal)
 """
 
-from database.models import ConfigModel, AlertModel, RiskModel, DeviceModel
+from database.models import ConfigModel
 import config
 
 
@@ -38,11 +38,12 @@ def evaluate_device_risk(device, current_sample, baseline, is_new_device=False):
         "unfamiliar_dest": 0
     }
     triggered_indicators = []
+    has_profile = bool(baseline and baseline.get("sample_count", 0) >= 3)
 
     # 1. Port Scanning Indicator (+30)
     ports_probed = current_sample.get("port_count", 0)
     ports_baseline = baseline.get("ports_contacted_avg", 3.0) if baseline else 3.0
-    if ports_probed >= config.THRESHOLDS["port_scan_unique_ports"] or ports_probed >= (ports_baseline * 3.5):
+    if ports_probed >= config.THRESHOLDS["port_scan_unique_ports"] or (has_profile and ports_probed >= (ports_baseline * 3.5)):
         sub_scores["port_scan"] = weights["port_scan"]
         triggered_indicators.append({
             "indicator": "Port Scanning Detected",
@@ -51,7 +52,7 @@ def evaluate_device_risk(device, current_sample, baseline, is_new_device=False):
         })
 
     # 2. Unknown / Unrecognized Device Indicator (+20)
-    if is_new_device or device.get("device_type") == "Unknown" or (baseline is None) or (baseline.get("sample_count", 0) == 0):
+    if is_new_device or (baseline is None) or not baseline.get("is_locked"):
         sub_scores["unknown_device"] = weights["unknown_device"]
         triggered_indicators.append({
             "indicator": "Unknown / Rogue Device",
@@ -62,7 +63,7 @@ def evaluate_device_risk(device, current_sample, baseline, is_new_device=False):
     # 3. DNS Anomaly Indicator (+20)
     dns_count = current_sample.get("dns_count", 0)
     dns_baseline = baseline.get("dns_queries_avg", 20.0) if baseline else 20.0
-    if dns_count >= (dns_baseline * config.THRESHOLDS["dns_volume_multiplier"]) and dns_count > 30:
+    if has_profile and dns_count >= (dns_baseline * config.THRESHOLDS["dns_volume_multiplier"]) and dns_count > 30:
         sub_scores["dns_anomaly"] = weights["dns_anomaly"]
         triggered_indicators.append({
             "indicator": "DNS Anomaly / Tunneling",
@@ -73,7 +74,7 @@ def evaluate_device_risk(device, current_sample, baseline, is_new_device=False):
     # 4. Traffic-Volume Spike Indicator (+15)
     bytes_kb = current_sample.get("bytes_transferred_kb", 0)
     bytes_baseline = baseline.get("bytes_transferred_kb_avg", 150.0) if baseline else 150.0
-    if bytes_kb >= (bytes_baseline * config.THRESHOLDS["traffic_spike_multiplier"]) and bytes_kb > 200:
+    if has_profile and bytes_kb >= (bytes_baseline * config.THRESHOLDS["traffic_spike_multiplier"]) and bytes_kb > 200:
         sub_scores["traffic_spike"] = weights["traffic_spike"]
         triggered_indicators.append({
             "indicator": "Traffic Volume Spike",
@@ -84,12 +85,19 @@ def evaluate_device_risk(device, current_sample, baseline, is_new_device=False):
     # 5. Connection to New / Unfamiliar Destination (+15)
     ips_count = current_sample.get("distinct_ips_count", 0)
     ips_baseline = baseline.get("distinct_ips_avg", 5.0) if baseline else 5.0
-    if ips_count >= (ips_baseline + config.THRESHOLDS["unfamiliar_dest_threshold"]) and ips_count > 6:
+    if "dest_ips" in current_sample and baseline and "known_dest_ips" in baseline:
+        new_destinations = set(current_sample["dest_ips"]) - set(baseline["known_dest_ips"])
+        unfamiliar = has_profile and len(new_destinations) >= config.THRESHOLDS["unfamiliar_dest_threshold"]
+        detail = f"Contacted {len(new_destinations)} external IPs outside the learned destination profile"
+    else:
+        unfamiliar = has_profile and ips_count >= (ips_baseline + config.THRESHOLDS["unfamiliar_dest_threshold"]) and ips_count > 6
+        detail = f"Contacted {ips_count} distinct external IPs (baseline is {ips_baseline:.1f})"
+    if unfamiliar:
         sub_scores["unfamiliar_dest"] = weights["unfamiliar_dest"]
         triggered_indicators.append({
             "indicator": "Unfamiliar External Destinations",
             "weight": weights["unfamiliar_dest"],
-            "detail": f"Contacted {ips_count} distinct external IPs (baseline is {ips_baseline:.1f})"
+            "detail": detail
         })
 
     # Total Risk Score (clamped to 100)

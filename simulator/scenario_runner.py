@@ -4,7 +4,7 @@ Directly executes the 4-phase demonstration workflow from Section 15 of proposal
 """
 
 from database.seed_data import seed_database
-from core.capture_engine import process_interval_evaluations
+from core.capture_engine import process_interval_evaluations, live_capture_status
 from core.quarantine_manager import release_device
 from simulator.normal_traffic import generate_single_benign_cycle
 from simulator.attack_scenarios import (
@@ -21,7 +21,7 @@ def demo_step_1_baseline():
     Step 1: Normal Network.
     5 devices connected and profiled, all in LOW risk on dashboard.
     """
-    seed_database(clean=True)
+    seed_database(clean=True, capture_mode_override=live_capture_status()["runtime_mode"])
     generate_single_benign_cycle()
     process_interval_evaluations()
 
@@ -68,7 +68,7 @@ def demo_step_3_escalation_quarantine():
     return {
         "step": 3,
         "title": "Threat Escalation & Automatic Quarantine",
-        "description": "Laptop 02 crossed critical threshold. Automated quarantine enforced!",
+        "description": "Laptop 02 crossed the critical threshold. A simulated quarantine policy was recorded.",
         "target": laptop2["name"],
         "new_risk_score": laptop2["current_risk_score"],
         "is_quarantined": bool(laptop2["is_quarantined"]),

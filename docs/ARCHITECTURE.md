@@ -3,6 +3,8 @@
 > **Computing Project (CNT 5015) — Technical Specification Document**  
 > **Cardiff Metropolitan University / ICBT Campus**
 
+The diagram below describes the intended pipeline. In the current build, the default data and containment paths are synthetic. Live capture requires a working Scapy interface positioned to see the relevant traffic. The router ACL is a policy preview; Windows and macOS firewall commands affect the monitoring host and have not been validated as whole-LAN isolation. See `docs/EVALUATION_METRICS.md` for the evidence boundary.
+
 ---
 
 ## 1. System Overview & High-Level Architecture

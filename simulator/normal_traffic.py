@@ -12,19 +12,13 @@ import time
 import random
 import threading
 from core.capture_engine import record_packet_event
-from database.seed_data import CANONICAL_DEVICES
+from database.seed_data import CANONICAL_DEVICES, BENIGN_EXTERNAL_IPS
 
 _simulator_running = False
 _simulator_thread = None
 
 # Known harmless external destination IPs (Google, Cloudflare, Microsoft, AWS)
-BENIGN_DEST_IPS = [
-    "142.250.190.46",  # Google
-    "172.217.16.206",  # Google
-    "104.16.132.229",  # Cloudflare
-    "20.112.52.29",    # Microsoft
-    "52.95.120.67"     # AWS CDN
-]
+BENIGN_DEST_IPS = BENIGN_EXTERNAL_IPS
 
 BENIGN_DNS_DOMAINS = [
     "google.com", "github.com", "cloudflare.com", "wikipedia.org", "icbt.lk",
@@ -32,7 +26,7 @@ BENIGN_DNS_DOMAINS = [
 ]
 
 
-from database.models import ConfigModel, DeviceModel
+from database.models import ConfigModel, DeviceModel, DEMO_MACS
 
 
 def generate_single_benign_cycle():
@@ -43,7 +37,7 @@ def generate_single_benign_cycle():
         return
 
     # Never auto-generate or inject dummy devices if database has no mock devices
-    existing_mock = [d for d in DeviceModel.get_all() if d.get("mac", "").startswith("00:1A:2B")]
+    existing_mock = [d for d in DeviceModel.get_all() if d.get("mac") in DEMO_MACS]
     if not existing_mock:
         return
 

@@ -4,8 +4,9 @@ Encapsulates CRUD operations for Devices, Baselines, Risk Scores, Alerts, and Lo
 """
 
 import json
-from datetime import datetime
 from database.db import get_db
+
+DEMO_MACS = tuple(f"00:1A:2B:3C:4D:{suffix:02X}" for suffix in range(1, 6))
 
 
 class DeviceModel:
@@ -47,6 +48,12 @@ class DeviceModel:
             return dict(row) if row else None
 
     @staticmethod
+    def get_by_ip(ip):
+        with get_db() as conn:
+            row = conn.execute("SELECT * FROM devices WHERE ip = ? ORDER BY last_seen DESC LIMIT 1", (ip,)).fetchone()
+            return dict(row) if row else None
+
+    @staticmethod
     def create(mac, ip, name, device_type="Unknown", is_whitelisted=False):
         with get_db() as conn:
             cursor = conn.cursor()
@@ -68,7 +75,7 @@ class DeviceModel:
             cursor.execute("""
                 INSERT INTO baselines
                 (device_id, dns_queries_avg, distinct_ips_avg, ports_contacted_avg, bytes_transferred_kb_avg, sample_count)
-                VALUES (?, 15.0, 4.0, 3.0, 100.0, 0)
+                VALUES (?, 0.0, 0.0, 0.0, 0.0, 0)
                 ON CONFLICT(device_id) DO NOTHING
             """, (device_id,))
             return device_id
@@ -156,28 +163,8 @@ class DeviceModel:
     def clear_mock_devices():
         """Removes only proposal mock / synthetic demonstration devices."""
         with get_db() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                DELETE FROM baselines WHERE device_id IN (
-                    SELECT id FROM devices WHERE mac LIKE '00:1A:2B%'
-                )
-            """)
-            cursor.execute("""
-                DELETE FROM traffic_samples WHERE device_id IN (
-                    SELECT id FROM devices WHERE mac LIKE '00:1A:2B%'
-                )
-            """)
-            cursor.execute("""
-                DELETE FROM risk_history WHERE device_id IN (
-                    SELECT id FROM devices WHERE mac LIKE '00:1A:2B%'
-                )
-            """)
-            cursor.execute("""
-                DELETE FROM alerts WHERE device_id IN (
-                    SELECT id FROM devices WHERE mac LIKE '00:1A:2B%'
-                )
-            """)
-            cursor.execute("DELETE FROM devices WHERE mac LIKE '00:1A:2B%'")
+            placeholders = ", ".join("?" for _ in DEMO_MACS)
+            conn.execute(f"DELETE FROM devices WHERE mac IN ({placeholders})", DEMO_MACS)
 
 
 class BaselineModel:
@@ -187,7 +174,11 @@ class BaselineModel:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM baselines WHERE device_id = ?", (device_id,))
             row = cursor.fetchone()
-            return dict(row) if row else None
+            if not row:
+                return None
+            baseline = dict(row)
+            baseline["known_dest_ips"] = json.loads(baseline.get("known_dest_ips") or "[]")
+            return baseline
 
     @staticmethod
     def update_baseline(device_id, dns_avg, ips_avg, ports_avg, bytes_kb_avg, increment_sample=True):
@@ -213,6 +204,17 @@ class BaselineModel:
         with get_db() as conn:
             cursor = conn.cursor()
             cursor.execute("UPDATE baselines SET is_locked = ? WHERE device_id = ?", (1 if is_locked else 0, device_id))
+
+    @staticmethod
+    def add_known_destinations(device_id, ips):
+        if not ips:
+            return
+        with get_db() as conn:
+            row = conn.execute("SELECT known_dest_ips FROM baselines WHERE device_id = ? AND is_locked = 0", (device_id,)).fetchone()
+            if row:
+                known = set(json.loads(row["known_dest_ips"] or "[]"))
+                known.update(ips)
+                conn.execute("UPDATE baselines SET known_dest_ips = ? WHERE device_id = ?", (json.dumps(sorted(known)), device_id))
 
 
 class TrafficModel:
@@ -280,6 +282,53 @@ class AlertModel:
             return cursor.lastrowid
 
     @staticmethod
+    def create_or_update_active(device_id, severity, indicator, message, drift_pct=0.0, risk_score=0):
+        """Keep one open alert per device and indicator during a continuous incident."""
+        with get_db() as conn:
+            row = conn.execute("""
+                SELECT id FROM alerts
+                WHERE device_id = ? AND indicator = ? AND resolved = 0
+                ORDER BY id DESC LIMIT 1
+            """, (device_id, indicator)).fetchone()
+            if row:
+                conn.execute("""
+                    UPDATE alerts SET severity = ?, message = ?, drift_pct = ?, risk_score = ?
+                    WHERE id = ?
+                """, (severity, message, drift_pct, risk_score, row["id"]))
+                return row["id"]
+            cursor = conn.execute("""
+                INSERT INTO alerts (device_id, severity, indicator, message, drift_pct, risk_score)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (device_id, severity, indicator, message, drift_pct, risk_score))
+            return cursor.lastrowid
+
+    @staticmethod
+    def resolve_inactive_indicators(device_id, active_indicators):
+        risk_indicators = (
+            "Port Scanning Detected", "Unknown / Rogue Device", "DNS Anomaly / Tunneling",
+            "Traffic Volume Spike", "Unfamiliar External Destinations"
+        )
+        with get_db() as conn:
+            if active_indicators:
+                placeholders = ", ".join("?" for _ in active_indicators)
+                conn.execute(f"""
+                    UPDATE alerts SET resolved = 1
+                    WHERE device_id = ? AND resolved = 0
+                    AND indicator IN ({', '.join('?' for _ in risk_indicators)})
+                    AND indicator NOT IN ({placeholders})
+                """, (device_id, *risk_indicators, *active_indicators))
+            else:
+                conn.execute(f"""
+                    UPDATE alerts SET resolved = 1 WHERE device_id = ? AND resolved = 0
+                    AND indicator IN ({', '.join('?' for _ in risk_indicators)})
+                """, (device_id, *risk_indicators))
+
+    @staticmethod
+    def resolve_all(device_id):
+        with get_db() as conn:
+            conn.execute("UPDATE alerts SET resolved = 1 WHERE device_id = ? AND resolved = 0", (device_id,))
+
+    @staticmethod
     def get_all(limit=50, unacknowledged_only=False):
         with get_db() as conn:
             cursor = conn.cursor()
@@ -289,7 +338,7 @@ class AlertModel:
                 JOIN devices d ON a.device_id = d.id
             """
             if unacknowledged_only:
-                query += " WHERE a.acknowledged = 0 "
+                query += " WHERE a.acknowledged = 0 AND a.resolved = 0 "
             query += " ORDER BY a.id DESC LIMIT ?"
             cursor.execute(query, (limit,))
             return [dict(row) for row in cursor.fetchall()]

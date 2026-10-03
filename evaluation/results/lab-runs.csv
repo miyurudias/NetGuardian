@@ -1,0 +1,25 @@
+source,scenario,repetition,expected_indicator,indicator_matched,expected_simulated_quarantine,simulated_quarantine,risk_score,processing_elapsed_ms,passed
+synthetic_simulation,normal,1,none,True,False,False,0,155.03,True
+synthetic_simulation,port_scan,1,Port Scanning Detected,True,False,False,45,64.87,True
+synthetic_simulation,dns_volume,1,DNS Anomaly / Tunneling,True,False,False,20,115.64,True
+synthetic_simulation,traffic_spike,1,Traffic Volume Spike,True,False,False,15,37.43,True
+synthetic_simulation,destinations,1,Unfamiliar External Destinations,True,False,False,15,17.77,True
+synthetic_simulation,combined,1,Port Scanning Detected,True,True,True,80,177.72,True
+synthetic_simulation,rogue,1,Unknown / Rogue Device,True,False,False,20,12.6,True
+synthetic_simulation,benign_update,1,none,True,False,False,0,20.96,True
+synthetic_simulation,normal,2,none,True,False,False,0,117.37,True
+synthetic_simulation,port_scan,2,Port Scanning Detected,True,False,False,45,37.45,True
+synthetic_simulation,dns_volume,2,DNS Anomaly / Tunneling,True,False,False,20,113.29,True
+synthetic_simulation,traffic_spike,2,Traffic Volume Spike,True,False,False,15,41.12,True
+synthetic_simulation,destinations,2,Unfamiliar External Destinations,True,False,False,15,19.12,True
+synthetic_simulation,combined,2,Port Scanning Detected,True,True,True,80,172.62,True
+synthetic_simulation,rogue,2,Unknown / Rogue Device,True,False,False,20,12.33,True
+synthetic_simulation,benign_update,2,none,True,False,False,0,20.98,True
+synthetic_simulation,normal,3,none,True,False,False,0,125.05,True
+synthetic_simulation,port_scan,3,Port Scanning Detected,True,False,False,45,37.14,True
+synthetic_simulation,dns_volume,3,DNS Anomaly / Tunneling,True,False,False,20,158.75,True
+synthetic_simulation,traffic_spike,3,Traffic Volume Spike,True,False,False,15,37.61,True
+synthetic_simulation,destinations,3,Unfamiliar External Destinations,True,False,False,15,17.95,True
+synthetic_simulation,combined,3,Port Scanning Detected,True,True,True,80,173.97,True
+synthetic_simulation,rogue,3,Unknown / Rogue Device,True,False,False,20,12.52,True
+synthetic_simulation,benign_update,3,none,True,False,False,0,20.4,True

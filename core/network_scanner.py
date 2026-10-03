@@ -13,6 +13,7 @@ import socket
 import platform
 import subprocess
 import concurrent.futures
+import ipaddress
 from pathlib import Path
 
 # Add project root to sys.path for direct invocation
@@ -108,21 +109,24 @@ def get_active_network_info():
         "interface": "en0" if "darwin" in os_name else ("eth0" if "linux" in os_name else "Ethernet"),
         "host_ip": "127.0.0.1",
         "host_mac": "00:00:00:00:00:00",
-        "gateway_ip": "192.168.1.1",
+        "gateway_ip": "",
         "subnet": "192.168.1.0/24",
         "netmask": "255.255.255.0",
         "status": "active"
     }
 
+    s = None
     try:
         # Determine host IP via UDP socket
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
         host_ip = s.getsockname()[0]
-        s.close()
         default_info["host_ip"] = host_ip
     except Exception:
         host_ip = "127.0.0.1"
+    finally:
+        if s is not None:
+            s.close()
 
     # macOS route & ifconfig detection
     if "darwin" in os_name:
@@ -146,10 +150,12 @@ def get_active_network_info():
             if ether_m:
                 default_info["host_mac"] = ether_m.group(1)
 
-            # Derive /24 subnet from host IP
-            octets = default_info["host_ip"].split(".")
-            if len(octets) == 4:
-                default_info["subnet"] = f"{octets[0]}.{octets[1]}.{octets[2]}.0/24"
+            mask_m = re.search(r"netmask (0x[0-9a-fA-F]+)", if_out)
+            if mask_m:
+                default_info["netmask"] = socket.inet_ntoa(bytes.fromhex(mask_m.group(1)[2:]))
+            default_info["subnet"] = str(ipaddress.ip_network(
+                f"{default_info['host_ip']}/{default_info['netmask']}", strict=False
+            ))
         except Exception as e:
             print(f"[!] Error detecting macOS network info: {e}")
 
@@ -165,20 +171,46 @@ def get_active_network_info():
                         gw_ip = socket.inet_ntoa(bytes.fromhex(gw_hex)[::-1])
                         default_info["gateway_ip"] = gw_ip
                         break
-            octets = default_info["host_ip"].split(".")
-            default_info["subnet"] = f"{octets[0]}.{octets[1]}.{octets[2]}.0/24"
+            default_info["subnet"] = str(ipaddress.ip_network(
+                f"{default_info['host_ip']}/{default_info['netmask']}", strict=False
+            ))
         except Exception as e:
             print(f"[!] Error detecting Linux network info: {e}")
 
     # Windows route detection
     elif "windows" in os_name:
         try:
-            ipconfig_out = subprocess.check_output(["ipconfig"], text=True)
-            gw_m = re.search(r"Default Gateway[ .]*: (\d+\.\d+\.\d+\.\d+)", ipconfig_out)
-            if gw_m:
-                default_info["gateway_ip"] = gw_m.group(1)
-            octets = default_info["host_ip"].split(".")
-            default_info["subnet"] = f"{octets[0]}.{octets[1]}.{octets[2]}.0/24"
+            ipconfig_out = subprocess.check_output(["ipconfig", "/all"], text=True, errors="replace")
+            blocks = re.split(r"\r?\n\s*\r?\n", ipconfig_out)
+            chosen = next((block for block in blocks if default_info["host_ip"] != "127.0.0.1" and default_info["host_ip"] in block), None)
+            if chosen is None:
+                chosen = next((block for block in blocks if re.search(r"IPv4 Address[^:]*:\s*(?!169\.254\.|127\.)(\d+\.\d+\.\d+\.\d+)", block)), None)
+            if chosen:
+                block = chosen
+                lines = block.splitlines()
+                if lines:
+                    adapter_name = lines[0].strip().rstrip(":")
+                    for prefix in ("Wireless LAN adapter ", "Ethernet adapter ", "Local Area Connection adapter "):
+                        if adapter_name.startswith(prefix):
+                            adapter_name = adapter_name[len(prefix):]
+                            break
+                    default_info["interface"] = adapter_name
+                ip_m = re.search(r"IPv4 Address[^:]*:\s*(\d+\.\d+\.\d+\.\d+)", block)
+                mac_m = re.search(r"Physical Address[^:]*:\s*([0-9A-Fa-f-]{17})", block)
+                mask_m = re.search(r"Subnet Mask[^:]*:\s*(\d+\.\d+\.\d+\.\d+)", block)
+                gw_m = re.search(r"Default Gateway[^:]*:\s*(\d+\.\d+\.\d+\.\d+)", block)
+                if ip_m:
+                    default_info["host_ip"] = ip_m.group(1)
+                if mac_m:
+                    default_info["host_mac"] = mac_m.group(1).replace("-", ":").upper()
+                if mask_m:
+                    default_info["netmask"] = mask_m.group(1)
+                if gw_m:
+                    default_info["gateway_ip"] = gw_m.group(1)
+            if default_info["host_ip"] != "127.0.0.1":
+                default_info["subnet"] = str(ipaddress.ip_network(
+                    f"{default_info['host_ip']}/{default_info['netmask']}", strict=False
+                ))
         except Exception as e:
             print(f"[!] Error detecting Windows network info: {e}")
 
@@ -252,13 +284,13 @@ def scan_local_lan(custom_subnet=None):
     host_ip = net_info["host_ip"]
     gateway_ip = net_info["gateway_ip"]
     active_iface = net_info["interface"]
+    if host_ip == "127.0.0.1":
+        return {"status": "error", "message": "No active IPv4 network interface was detected.", "network_info": net_info, "devices": []}
+    network = ipaddress.ip_network(net_info["subnet"], strict=False)
+    if network.num_addresses > 1024:
+        return {"status": "error", "message": "Automatic discovery is limited to local subnets with at most 1024 addresses.", "network_info": net_info, "devices": []}
 
-    # Determine subnet prefix e.g. "192.168.1"
-    octets = host_ip.split(".")
-    if len(octets) != 4 or host_ip == "127.0.0.1":
-        octets = gateway_ip.split(".")
-    prefix = f"{octets[0]}.{octets[1]}.{octets[2]}"
-    bcast_ip = f"{prefix}.255"
+    bcast_ip = str(network.broadcast_address)
 
     # Step 1: Broadcast wakeup bursts to trigger ARP resolution across Wi-Fi stations
     for b_target in [bcast_ip, "255.255.255.255"]:
@@ -278,7 +310,7 @@ def scan_local_lan(custom_subnet=None):
             except Exception:
                 pass
 
-    # Step 2: Multi-port active probing across all 254 IPs
+    # Step 2: Multi-port active probing across the detected local subnet
     # Ports that wake up and fingerprint Smart TVs, Phones, Laptops, IoT, and Routers
     SWEEP_PORTS = [80, 443, 8008, 8009, 8001, 3000, 7000, 62078, 445, 137, 5353, 554, 9100]
 
@@ -302,7 +334,7 @@ def scan_local_lan(custom_subnet=None):
         except Exception:
             pass
 
-    targets = [f"{prefix}.{i}" for i in range(1, 255)]
+    targets = [str(address) for address in network.hosts()]
     with concurrent.futures.ThreadPoolExecutor(max_workers=128) as ex:
         list(ex.map(_probe_ip, targets))
 
@@ -340,7 +372,7 @@ def scan_local_lan(custom_subnet=None):
     _read_arp()
 
     # Always ensure the local host machine is represented
-    if host_ip != "127.0.0.1" and host_ip not in arp_entries:
+    if host_ip != "127.0.0.1" and host_ip not in arp_entries and net_info["host_mac"] != "00:00:00:00:00:00":
         host_mac = net_info["host_mac"].upper()
         mac_norm = ":".join([p.zfill(2) for p in host_mac.split(":")])
         arp_entries[host_ip] = {"mac": mac_norm, "iface": active_iface}
@@ -558,19 +590,10 @@ def import_real_devices_to_inventory(discovered_devices):
                 ip=ip,
                 name=name,
                 device_type=dev_type,
-                is_whitelisted=is_gw  # Automatically whitelist gateway to prevent accidental self-isolation!
+                is_whitelisted=is_gw or d.get("is_localhost", False)
             )
-            # Assign baseline based on device type
-            if dev_type == "Router":
-                BaselineModel.update_baseline(dev_id, dns_avg=150.0, ips_avg=25.0, ports_avg=8.0, bytes_kb_avg=1200.0, increment_sample=False)
-            elif dev_type == "Printer":
-                BaselineModel.update_baseline(dev_id, dns_avg=3.0, ips_avg=1.0, ports_avg=2.0, bytes_kb_avg=60.0, increment_sample=False)
-            elif dev_type == "Phone":
-                BaselineModel.update_baseline(dev_id, dns_avg=30.0, ips_avg=8.0, ports_avg=4.0, bytes_kb_avg=180.0, increment_sample=False)
-            else:
-                BaselineModel.update_baseline(dev_id, dns_avg=45.0, ips_avg=12.0, ports_avg=5.0, bytes_kb_avg=350.0, increment_sample=False)
-
-            BaselineModel.set_lock(dev_id, True)
+            # Newly discovered hardware must learn from observed clean intervals.
+            # Device type is an inventory label, not evidence of a measured baseline.
             imported_ids.append(dev_id)
         else:
             # Update IP, name, and device type if refined by multi-protocol scanner

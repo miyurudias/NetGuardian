@@ -1,5 +1,4 @@
 /* NetGuard Enterprise - Modern Cybersecurity Design System */
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 :root {
   --bg-main: #070b14;
@@ -98,6 +97,17 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 button { min-height: 2.25rem; }
 button[title] { position: relative; }
 
+.device-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 2.25rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+}
+
 table tbody tr { transition: background-color .16s ease; }
 table tbody tr:hover { background-color: rgba(30, 41, 59, .36); }
 table th { white-space: nowrap; }
@@ -158,6 +168,12 @@ select option {
   background-color: rgba(16, 185, 129, 0.1);
   color: #34D399;
   border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.badge-info {
+  background-color: rgba(14, 165, 233, 0.1);
+  color: #7DD3FC;
+  border: 1px solid rgba(14, 165, 233, 0.3);
 }
 
 .badge-medium {

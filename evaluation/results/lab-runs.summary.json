@@ -1,0 +1,7 @@
+{
+  "source": "synthetic_simulation",
+  "runs": 24,
+  "passed": 24,
+  "failed": 0,
+  "note": "Processing duration is local software time, not live capture or network isolation latency."
+}

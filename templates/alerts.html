@@ -315,7 +315,7 @@
 
           <div class="flex items-center space-x-2 self-end sm:self-center shrink-0">
             ${!alert.acknowledged ? `
-              <button onclick="acknowledgeAlert(${alert.id})" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs border border-slate-700 transition flex items-center space-x-1 font-medium">
+              <button onclick="acknowledgeAlert(${alert.id})" class="h-9 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs border border-slate-700 transition inline-flex items-center justify-center gap-1 font-medium">
                 <i class="fa-solid fa-check text-emerald-400 text-[10px]"></i>
                 <span>Acknowledge</span>
               </button>
@@ -325,7 +325,7 @@
                 <span>Resolved</span>
               </span>
             `}
-            <a href="/device/${alert.device_id}" class="px-3 py-1.5 rounded-lg bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 text-xs border border-blue-800/50 font-semibold transition flex items-center space-x-1">
+            <a href="/device/${alert.device_id}" class="h-9 px-3 rounded-lg bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 text-xs border border-blue-800/50 font-semibold transition inline-flex items-center justify-center gap-1">
               <span>Forensics</span>
               <i class="fa-solid fa-arrow-right text-[10px]"></i>
             </a>

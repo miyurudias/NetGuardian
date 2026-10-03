@@ -14,11 +14,12 @@ DATABASE_PATH = os.environ.get("NETGUARD_DB", str(BASE_DIR / "netguard.db"))
 HOST = os.environ.get("NETGUARD_HOST", "127.0.0.1")
 PORT = int(os.environ.get("NETGUARD_PORT", 5050))
 DEBUG = os.environ.get("NETGUARD_DEBUG", "False").lower() in ("true", "1", "yes")
+RESTART_EXIT_CODE = 75  # Launcher replaces the server child after this exit status.
 
 # Traffic Capture Settings
 # Dual-Mode: "LIVE" (Scapy sniff) or "SIMULATED" (synthetic lab traffic)
 CAPTURE_MODE = os.environ.get("NETGUARD_MODE", "SIMULATED").upper()
-CAPTURE_INTERFACE = os.environ.get("NETGUARD_IFACE", "en0")  # e.g., 'eth0', 'en0', 'Wi-Fi'
+CAPTURE_INTERFACE = os.environ.get("NETGUARD_IFACE")  # e.g., 'eth0', 'en0', 'Wi-Fi'; auto-detect if unset
 CAPTURE_SAMPLE_INTERVAL_SECONDS = 5  # aggregation window for metric calculations
 
 # Baseline learning for newly discovered devices. Profiles are built only from

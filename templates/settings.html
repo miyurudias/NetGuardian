@@ -167,7 +167,7 @@
             <option value="LINUX" class="bg-[#0F1626] text-slate-200 py-1.5">Linux Host / Gateway Firewall (iptables)</option>
             <option value="PFCTL" class="bg-[#0F1626] text-slate-200 py-1.5">macOS / BSD Packet Filter (pfctl)</option>
           </select>
-          <p class="text-[11px] text-slate-500">The simulated option is safest for assessment. Host firewall targets require privileges and a controlled environment.</p>
+          <p class="text-[11px] text-slate-500">Host firewall backends become available in Live LAN and affect this laptop only.</p>
         </div>
 
         <!-- Traffic Ingestion Mode -->
@@ -177,7 +177,7 @@
             <option value="LIVE" class="bg-[#0F1626] text-slate-200 py-1.5">Live Physical Network Sniffing (Scapy / Raw Sockets)</option>
             <option value="SIMULATED" class="bg-[#0F1626] text-slate-200 py-1.5">Synthetic Lab Generator (Controlled Demo Mode)</option>
           </select>
-          <p class="text-[11px] text-slate-500">Source of Layer 3/4 packet streams and telemetry. Restart NetGuard after changing this setting.</p>
+          <p id="capture-runtime-status" role="status" class="text-[11px] text-slate-300 bg-slate-800/70 border border-slate-700 rounded-lg px-3 py-2">Checking capture status...</p>
         </div>
 
         <!-- Autonomous Quarantine Toggle Switch -->
@@ -197,6 +197,9 @@
 
     <!-- Submit Action -->
     <div class="flex items-center justify-end space-x-3 pt-2">
+      <button id="restart-netguard-btn" type="button" onclick="restartNetGuard()" class="hidden px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-600 transition disabled:opacity-50">
+        <i class="fa-solid fa-rotate mr-1.5"></i>Restart NetGuard
+      </button>
       <button type="submit" class="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition shadow-md shadow-blue-600/30 flex items-center space-x-2">
         <i class="fa-solid fa-floppy-disk"></i>
         <span>Save Configuration</span>
@@ -327,10 +330,25 @@
       showToast('Risk weights must total 100 points or fewer', 'warning');
       return;
     }
+    if (payload.quarantine_backend !== 'SIMULATED') {
+      try {
+        const mode = await refreshModeStatus();
+        if (mode.operating_mode !== 'LIVE_LAN') {
+          showToast('Keep quarantine enforcement Simulated while in the demo lab. Save Live capture, restart NetGuard, switch to Live LAN, then choose a firewall backend.', 'warning');
+          return;
+        }
+      } catch (err) {
+        showToast('Could not verify Live LAN mode before enabling a firewall backend.', 'error');
+        return;
+      }
+    }
     if (payload.quarantine_backend !== 'SIMULATED' && !confirm('This can run firewall commands on the host. Confirm you are authorised and using a controlled environment.')) {
       return;
     }
-    payload.authorization_confirmed = payload.quarantine_backend !== 'SIMULATED';
+    if (payload.capture_mode === 'LIVE' && !confirm('Live packet capture requires permission on the selected interface and an authorised network. Continue?')) {
+      return;
+    }
+    payload.authorization_confirmed = payload.quarantine_backend !== 'SIMULATED' || payload.capture_mode === 'LIVE';
 
     try {
       const res = await fetch('/api/settings', {
@@ -340,12 +358,43 @@
       });
       const result = await res.json();
       if (result.status === 'success') {
-        showToast(result.message || 'Configuration updated successfully', 'success');
+        await refreshModeStatus();
+        showToast(result.restart_required ? 'Settings saved. Use Restart NetGuard to apply the capture mode.' : 'Configuration updated successfully.', result.restart_required ? 'warning' : 'success');
       } else {
         showToast(result.message || 'Failed to save settings', 'error');
       }
     } catch (err) {
       showToast('Error saving settings', 'error');
+    }
+  }
+
+  async function restartNetGuard() {
+    const button = document.getElementById('restart-netguard-btn');
+    button.disabled = true;
+    button.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i>Restarting...';
+    try {
+      let status = await restartNetGuardAndWait();
+      if (status.capture_mode === 'LIVE' && status.operating_mode === 'LAB_SIMULATION') {
+        button.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i>Starting Live LAN...';
+        for (let attempt = 0; attempt < 30 && !status.capture?.ready && !status.capture?.error; attempt++) {
+          await new Promise(resolve => setTimeout(resolve, 750));
+          status = await fetch('/api/mode/status', { cache: 'no-store' }).then(res => res.json());
+        }
+        if (!status.capture?.ready) throw new Error(status.capture?.error || 'Live capture is not ready. Check the interface and permissions.');
+        const switchResponse = await fetch('/api/mode/switch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'LIVE_LAN', authorization_confirmed: true })
+        });
+        const switched = await switchResponse.json();
+        if (!switchResponse.ok || switched.status !== 'success') throw new Error(switched.message || 'Could not start Live LAN');
+      }
+      window.location.reload();
+    } catch (err) {
+      await refreshModeStatus().catch(() => {});
+      showToast(err.message || 'Restart failed', 'error');
+      button.disabled = false;
+      button.innerHTML = '<i class="fa-solid fa-rotate mr-1.5"></i>Restart NetGuard';
     }
   }
 

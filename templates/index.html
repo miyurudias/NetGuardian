@@ -15,7 +15,7 @@
       <div>
         <div class="flex items-center space-x-2">
           <h2 class="text-sm font-bold text-white tracking-wide" id="active-env-title">Academic demonstration lab</h2>
-          <span id="active-mode-badge" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-800/50">
+          <span id="active-mode-badge" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-950/90 text-cyan-400 border border-cyan-800/60">
             SIMULATED DATA
           </span>
         </div>
@@ -52,7 +52,7 @@
         <span id="stat-total-devices" class="text-3xl font-extrabold text-white tracking-tight">0</span>
         <div class="flex items-center justify-between mt-1 text-[11px] text-slate-400">
           <span>LAN Devices</span>
-          <span class="text-cyan-400 font-mono">100% Monitored</span>
+          <span class="text-cyan-400 font-mono">In inventory</span>
         </div>
       </div>
     </div>
@@ -119,8 +119,8 @@
       <div class="mt-3">
         <span id="stat-quarantined-devices" class="text-3xl font-extrabold text-red-400 tracking-tight">0</span>
         <div class="flex items-center justify-between mt-1 text-[11px] text-slate-400">
-          <span>Automated ACL</span>
-          <span class="text-red-400 font-mono">ISOLATED</span>
+          <span>Containment records</span>
+          <span class="text-red-400 font-mono">Review status</span>
         </div>
       </div>
     </div>
@@ -175,7 +175,7 @@
           <span id="gauge-highest-host" class="text-white font-semibold truncate block mt-0.5">None (0.0%)</span>
         </div>
         <div class="bg-slate-900/50 p-2.5 rounded-xl border border-slate-800/60">
-          <span class="text-slate-400 block text-[10px]">Active Enforcement:</span>
+          <span class="text-slate-400 block text-[10px]">Configured backend:</span>
           <span id="gauge-enforce-mode" class="text-cyan-400 font-mono font-bold block mt-0.5">Simulated ACL policy</span>
         </div>
       </div>
@@ -197,7 +197,7 @@
       </div>
       
       <!-- Live Incident Timeline -->
-      <div id="live-alert-feed" class="flex-1 overflow-y-auto max-h-60 space-y-2.5 pr-1 flex flex-col justify-center">
+      <div id="live-alert-feed" class="min-h-0 h-60 overflow-y-auto space-y-2.5 pr-2 py-1 overscroll-contain" role="feed" aria-label="Recent security events">
         <div class="py-8 px-4 flex flex-col items-center justify-center text-center space-y-2.5">
           <div class="w-12 h-12 rounded-xl bg-emerald-950/70 border border-emerald-500/30 flex items-center justify-center shadow-lg shadow-emerald-950/40 ring-1 ring-emerald-500/20">
             <svg class="w-6 h-6 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -271,7 +271,7 @@
             <th class="py-3 px-4">Hardware & Vendor</th>
             <th class="py-3 px-4">IP & MAC Address</th>
             <th class="py-3 px-4">Category</th>
-            <th class="py-3 px-4">Live Latency</th>
+            <th class="py-3 px-4">Ping Latency</th>
             <th class="py-3 px-4">Behavior Drift</th>
             <th class="py-3 px-4">Risk Score</th>
             <th class="py-3 px-4">Status</th>

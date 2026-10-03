@@ -63,16 +63,20 @@ def init_db():
         CREATE TABLE IF NOT EXISTS baselines (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             device_id INTEGER UNIQUE NOT NULL,
-            dns_queries_avg REAL NOT NULL DEFAULT 20.0,
-            distinct_ips_avg REAL NOT NULL DEFAULT 5.0,
-            ports_contacted_avg REAL NOT NULL DEFAULT 3.0,
-            bytes_transferred_kb_avg REAL NOT NULL DEFAULT 150.0,
-            sample_count INTEGER NOT NULL DEFAULT 1,
+            dns_queries_avg REAL NOT NULL DEFAULT 0.0,
+            distinct_ips_avg REAL NOT NULL DEFAULT 0.0,
+            ports_contacted_avg REAL NOT NULL DEFAULT 0.0,
+            bytes_transferred_kb_avg REAL NOT NULL DEFAULT 0.0,
+            known_dest_ips TEXT NOT NULL DEFAULT '[]',
+            sample_count INTEGER NOT NULL DEFAULT 0,
             is_locked BOOLEAN NOT NULL DEFAULT 0,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (device_id) REFERENCES devices (id) ON DELETE CASCADE
         )
         """)
+        baseline_columns = {row["name"] for row in cursor.execute("PRAGMA table_info(baselines)")}
+        if "known_dest_ips" not in baseline_columns:
+            cursor.execute("ALTER TABLE baselines ADD COLUMN known_dest_ips TEXT NOT NULL DEFAULT '[]'")
 
         # 3. Traffic Samples (Interval Measurements)
         cursor.execute("""

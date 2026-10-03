@@ -6,6 +6,7 @@ Aggregates per-device metrics and drives the Drift and Risk evaluation loop.
 
 import time
 import threading
+import ipaddress
 from collections import defaultdict
 from database.models import DeviceModel, BaselineModel, TrafficModel, RiskModel, AlertModel, ConfigModel
 from core.device_profiler import process_device_observation
@@ -27,13 +28,39 @@ _device_accumulators = defaultdict(lambda: {
 
 _engine_running = False
 _engine_thread = None
+_live_capture_ready = threading.Event()
+_live_capture_error = None
+_local_network = ipaddress.ip_network(config.LOCAL_SUBNET, strict=False)
+_operating_mode = "LAB_SIMULATION"
+_capture_mode_runtime = "SIMULATED"
 
 
-def record_packet_event(src_mac, src_ip, dst_ip, dst_port, protocol, length, is_dns=False, dns_query=None):
+def set_local_network(subnet):
+    """Use the discovered lab subnet for external-destination classification."""
+    global _local_network
+    _local_network = ipaddress.ip_network(subnet, strict=False)
+
+
+def set_operating_mode(mode):
+    global _operating_mode
+    with _interval_lock:
+        _device_accumulators.clear()
+        _operating_mode = mode
+
+
+def live_capture_status():
+    return {"ready": _live_capture_ready.is_set(), "error": _live_capture_error, "runtime_mode": _capture_mode_runtime}
+
+
+def _source_enabled(source):
+    return (source == "LIVE" and _operating_mode == "LIVE_LAN") or (source == "SIMULATED" and _operating_mode == "LAB_SIMULATION")
+
+
+def record_packet_event(src_mac, src_ip, dst_ip, dst_port, protocol, length, is_dns=False, dns_query=None, source="SIMULATED"):
     """
     Called by live sniffer or traffic simulator for every observed packet.
     """
-    if not src_mac or not src_ip:
+    if not src_mac or not src_ip or not _source_enabled(source):
         return
 
     # Check device discovery
@@ -48,11 +75,26 @@ def record_packet_event(src_mac, src_ip, dst_ip, dst_port, protocol, length, is_
         acc["is_new_device"] = acc["is_new_device"] or is_new
         if is_dns:
             acc["dns_count"] += 1
-        if dst_ip and dst_ip != config.GATEWAY_IP and not dst_ip.startswith("192.168.1."):
-            acc["distinct_ips"].add(dst_ip)
+        if dst_ip:
+            try:
+                destination = ipaddress.ip_address(dst_ip)
+                if destination not in _local_network and not destination.is_loopback and not destination.is_multicast and not destination.is_link_local:
+                    acc["distinct_ips"].add(dst_ip)
+            except ValueError:
+                pass
         if dst_port:
             acc["ports_contacted"].add(dst_port)
         acc["bytes_sent"] += length
+
+
+def record_received_packet_event(dst_ip, length):
+    """Credit inbound bytes to a known local destination during live capture."""
+    if not _source_enabled("LIVE"):
+        return
+    device = DeviceModel.get_by_ip(dst_ip)
+    if device:
+        with _interval_lock:
+            _device_accumulators[device["id"]]["bytes_recv"] += length
 
 
 def process_interval_evaluations():
@@ -87,6 +129,7 @@ def process_interval_evaluations():
         current_sample = {
             "dns_count": dns_count,
             "distinct_ips_count": distinct_ips_count,
+            "dest_ips": list(acc["distinct_ips"]),
             "port_count": port_count,
             "bytes_transferred_kb": bytes_kb
         }
@@ -128,10 +171,11 @@ def process_interval_evaluations():
         )
 
         # 4. Check for Alert Generation
+        AlertModel.resolve_inactive_indicators(dev_id, [r["indicator"] for r in triggered_rules])
         if triggered_rules and not device.get("is_quarantined"):
             for rule in triggered_rules:
                 severity = "Critical" if total_risk >= 70 else ("Medium" if total_risk >= 40 else "Low")
-                AlertModel.create(
+                AlertModel.create_or_update_active(
                     device_id=dev_id,
                     severity=severity,
                     indicator=rule["indicator"],
@@ -146,8 +190,9 @@ def process_interval_evaluations():
 
         if total_risk >= quarantine_threshold and auto_quarantine_setting and not device.get("is_quarantined"):
             reason = f"Combined Risk Score ({total_risk}/100) crossed critical threshold ({quarantine_threshold}). Rules: {', '.join([r['indicator'] for r in triggered_rules])}"
-            quarantine_device(dev_id, reason=reason, manual=False)
-            status = "Quarantined"
+            quarantined, _ = quarantine_device(dev_id, reason=reason, manual=False)
+            if quarantined:
+                status = "Quarantined"
 
         # Learn a baseline only from clean intervals. This prevents an attack
         # from being absorbed into the normal profile of a newly seen device.
@@ -156,15 +201,17 @@ def process_interval_evaluations():
         )
         if baseline and not baseline.get("is_locked") and not has_behavioural_anomaly:
             alpha = config.BASELINE_EWMA_ALPHA
+            first_sample = baseline.get("sample_count", 0) == 0
             learned = {
-                "dns": (1 - alpha) * baseline["dns_queries_avg"] + alpha * dns_count,
-                "ips": (1 - alpha) * baseline["distinct_ips_avg"] + alpha * distinct_ips_count,
-                "ports": (1 - alpha) * baseline["ports_contacted_avg"] + alpha * port_count,
-                "bytes": (1 - alpha) * baseline["bytes_transferred_kb_avg"] + alpha * bytes_kb,
+                "dns": dns_count if first_sample else (1 - alpha) * baseline["dns_queries_avg"] + alpha * dns_count,
+                "ips": distinct_ips_count if first_sample else (1 - alpha) * baseline["distinct_ips_avg"] + alpha * distinct_ips_count,
+                "ports": port_count if first_sample else (1 - alpha) * baseline["ports_contacted_avg"] + alpha * port_count,
+                "bytes": bytes_kb if first_sample else (1 - alpha) * baseline["bytes_transferred_kb_avg"] + alpha * bytes_kb,
             }
             BaselineModel.update_baseline(
                 dev_id, learned["dns"], learned["ips"], learned["ports"], learned["bytes"]
             )
+            BaselineModel.add_known_destinations(dev_id, acc["distinct_ips"])
             if baseline.get("sample_count", 0) + 1 >= config.BASELINE_LEARNING_SAMPLES:
                 BaselineModel.set_lock(dev_id, True)
 
@@ -174,8 +221,12 @@ def process_interval_evaluations():
 
 def _live_sniff_worker(interface):
     """Worker thread using Scapy to sniff raw network packets."""
+    global _live_capture_error
     try:
-        from scapy.all import sniff, IP, TCP, UDP, DNS, DNSQR
+        from scapy.all import sniff, conf, IP, TCP, UDP, DNS, DNSQR
+        socket = conf.L2listen(iface=interface)
+        _live_capture_error = None
+        _live_capture_ready.set()
         print(f"[*] Starting live Scapy capture on interface {interface}...")
 
         def _packet_callback(pkt):
@@ -183,7 +234,7 @@ def _live_sniff_worker(interface):
                 src_ip = pkt[IP].src
                 dst_ip = pkt[IP].dst
                 length = len(pkt)
-                src_mac = pkt.src if hasattr(pkt, "src") else "00:00:00:00:00:00"
+                src_mac = pkt.src if hasattr(pkt, "src") else None
                 protocol = "OTHER"
                 dst_port = 0
                 is_dns = False
@@ -194,14 +245,24 @@ def _live_sniff_worker(interface):
                 elif UDP in pkt:
                     protocol = "UDP"
                     dst_port = pkt[UDP].dport
-                    if DNS in pkt and pkt.haslayer(DNSQR):
+                    if dst_port == 53 and DNS in pkt and pkt.haslayer(DNSQR) and pkt[DNS].qr == 0:
                         is_dns = True
 
-                record_packet_event(src_mac, src_ip, dst_ip, dst_port, protocol, length, is_dns)
+                if ipaddress.ip_address(src_ip) in _local_network:
+                    record_packet_event(src_mac, src_ip, dst_ip, dst_port, protocol, length, is_dns, source="LIVE")
+                if ipaddress.ip_address(dst_ip) in _local_network:
+                    record_received_packet_event(dst_ip, length)
 
-        sniff(iface=interface, prn=_packet_callback, store=0)
+        try:
+            while _engine_running:
+                sniff(opened_socket=socket, prn=_packet_callback, store=False, timeout=1)
+        finally:
+            socket.close()
     except Exception as e:
-        print(f"[!] Live capture error: {e}. Switching to Simulated Mode.")
+        _live_capture_error = str(e)
+        print(f"[!] Live capture error: {e}.")
+    finally:
+        _live_capture_ready.clear()
 
 
 def _engine_loop():
@@ -217,19 +278,26 @@ def _engine_loop():
 
 def start_capture_engine():
     """Starts the capture and evaluation background threads."""
-    global _engine_running, _engine_thread
+    global _engine_running, _engine_thread, _capture_mode_runtime
     if _engine_running:
         return
 
+    set_operating_mode(ConfigModel.get("operating_mode", "LAB_SIMULATION"))
     _engine_running = True
     _engine_thread = threading.Thread(target=_engine_loop, daemon=True)
     _engine_thread.start()
 
     mode = ConfigModel.get("capture_mode", config.CAPTURE_MODE)
+    _capture_mode_runtime = mode
     if mode == "LIVE":
+        from core.network_scanner import get_active_network_info
+        network_info = get_active_network_info()
+        interface = config.CAPTURE_INTERFACE or network_info["interface"]
+        if network_info["host_ip"] != "127.0.0.1":
+            set_local_network(network_info["subnet"])
         sniff_thread = threading.Thread(
             target=_live_sniff_worker,
-            args=(config.CAPTURE_INTERFACE,),
+            args=(interface,),
             daemon=True
         )
         sniff_thread.start()

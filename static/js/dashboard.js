@@ -4,6 +4,120 @@ let threatGaugeChartInstance = null;
 let cachedDevices = [];
 let discoveredScanCache = [];
 let currentOperatingMode = 'LAB_SIMULATION';
+let liveCaptureReady = false;
+let lastModeStatus = null;
+const measuredLatencies = new Map();
+let demoSwitchPendingRestart = false;
+
+const MAC_CAPTURE_HELP = 'https://www.wireshark.org/docs/wsug_html_chunked/ChBuildInstallOSXInstall.html';
+
+function captureState(data) {
+  if (!data.capture_mode && !data.capture?.runtime_mode) return { message: 'Capture status unavailable.', label: 'Unknown' };
+  const configured = data.capture_mode || 'SIMULATED';
+  const runtime = data.capture?.runtime_mode || 'SIMULATED';
+  if (configured !== 'LIVE') {
+    if (runtime === 'LIVE') return { message: 'Demo capture saved. Restart NetGuard in Settings.', label: 'Restart required', action: { text: 'Open Settings', href: '/settings' } };
+    return { message: 'Set capture to Live in Settings.', label: 'Off', action: { text: 'Update Settings', href: '/settings' } };
+  }
+  if (runtime !== 'LIVE') return { message: 'Live capture saved. Restart NetGuard.', label: 'Restart required' };
+  if (data.capture?.error) {
+    if (data.capture.error.includes('/dev/bpf')) {
+      return { message: 'Capture unavailable: macOS permission required.', label: 'Permission denied', action: { text: 'Capture help', href: MAC_CAPTURE_HELP } };
+    }
+    if (data.capture.error.includes('Permission denied')) return { message: 'Capture unavailable: permission required.', label: 'Permission denied' };
+    return { message: 'Live capture unavailable. Check the interface and process permissions.', label: 'Error' };
+  }
+  if (!data.capture?.ready) return { message: 'Live capture is starting...', label: 'Starting' };
+  return { message: 'Live capture ready.', label: 'Ready' };
+}
+
+function updateCaptureAction(link, action) {
+  if (!link) return;
+  link.classList.toggle('hidden', !action);
+  if (!action) return;
+  link.textContent = action.text;
+  link.href = action.href;
+  link.target = action.href.startsWith('https://') ? '_blank' : '_self';
+  link.rel = link.target === '_blank' ? 'noopener noreferrer' : '';
+}
+
+async function refreshModeStatus() {
+  const res = await fetch('/api/mode/status');
+  if (!res.ok) throw new Error('Could not check capture status');
+  const data = await res.json();
+  if (data.status !== 'success') throw new Error(data.message || 'Could not check capture status');
+  lastModeStatus = data;
+  currentOperatingMode = data.operating_mode;
+  liveCaptureReady = data.capture_mode === 'LIVE' && data.capture.ready;
+  updateModeUI(currentOperatingMode);
+  updateCaptureAvailability(data);
+  return data;
+}
+
+function updateCaptureAvailability(data = lastModeStatus || { capture: {} }) {
+  const importBtn = document.getElementById('btn-import-scan') || document.getElementById('modal-import-btn');
+  const notice = document.getElementById('scan-capture-notice');
+  const noticeMessage = document.getElementById('scan-capture-message');
+  const noticeActionLink = document.getElementById('scan-capture-action-link');
+  const liveHelp = document.getElementById('live-mode-help');
+  const liveHelpMessage = document.getElementById('live-mode-message');
+  const liveActionLink = document.getElementById('live-mode-action-link');
+  const settingsStatus = document.getElementById('capture-runtime-status');
+  const restartButton = document.getElementById('restart-netguard-btn');
+  const liveButton = document.getElementById('btn-mode-live');
+  const backendSelect = document.getElementById('quarantine_backend');
+  const enforcementLabel = document.getElementById('gauge-enforce-mode');
+  const headerMode = document.getElementById('header-mode-badge');
+  const floatingSensor = document.getElementById('floating-sensor-status');
+  const footerSensor = document.getElementById('footer-sensor-status');
+  const floatingLed = document.getElementById('floating-lan-led');
+  const floatingPulse = document.getElementById('floating-lan-pulse');
+  const state = captureState(data);
+  const sensorLabel = liveCaptureReady ? 'Live capture ready' : (currentOperatingMode === 'LAB_SIMULATION' ? 'Simulation active' : 'Live capture unavailable');
+  if (headerMode) headerMode.textContent = currentOperatingMode === 'LIVE_LAN' ? 'LIVE' : 'LAB';
+  if (floatingSensor) floatingSensor.textContent = sensorLabel;
+  if (footerSensor) footerSensor.textContent = sensorLabel;
+  if (floatingLed) floatingLed.className = `relative inline-flex rounded-full h-2 w-2 ${liveCaptureReady ? 'bg-emerald-500' : currentOperatingMode === 'LAB_SIMULATION' ? 'bg-blue-500' : 'bg-rose-500'}`;
+  if (floatingPulse) floatingPulse.className = `absolute inline-flex h-full w-full rounded-full opacity-50 ${liveCaptureReady ? 'animate-ping bg-emerald-400' : currentOperatingMode === 'LAB_SIMULATION' ? 'bg-blue-400' : 'bg-rose-400'}`;
+  if (importBtn && discoveredScanCache.length) {
+    importBtn.disabled = !liveCaptureReady;
+    importBtn.title = liveCaptureReady ? 'Import discovered devices for live monitoring' : state.message;
+    importBtn.innerHTML = liveCaptureReady
+      ? `<i class="fa-solid fa-cloud-arrow-down text-xs mr-1.5"></i><span>Import All Devices (${discoveredScanCache.length})</span>`
+      : '<i class="fa-solid fa-lock text-xs mr-1.5"></i><span>Live capture required</span>';
+  }
+  if (notice) {
+    notice.classList.toggle('hidden', liveCaptureReady);
+    if (noticeMessage) noticeMessage.textContent = data.capture?.error?.includes('/dev/bpf')
+      ? 'Import requires macOS capture permission.'
+      : `Import unavailable — ${state.message}`;
+  }
+  updateCaptureAction(noticeActionLink, state.action);
+  if (liveHelp) liveHelp.classList.toggle('hidden', liveCaptureReady);
+  if (liveHelpMessage) liveHelpMessage.textContent = state.message;
+  updateCaptureAction(liveActionLink, state.action);
+  if (liveButton) {
+    liveButton.disabled = !liveCaptureReady;
+    liveButton.classList.toggle('opacity-50', !liveCaptureReady);
+    liveButton.classList.toggle('cursor-not-allowed', !liveCaptureReady);
+    liveButton.title = liveCaptureReady ? 'Switch to live LAN monitoring' : state.message;
+  }
+  if (settingsStatus) {
+    settingsStatus.textContent = `Saved: ${data.capture_mode || 'unknown'} · Running: ${data.capture?.runtime_mode || 'unknown'} · Capture: ${state.label}`;
+    settingsStatus.title = data.capture?.error || '';
+  }
+  if (restartButton) restartButton.classList.toggle('hidden', !data.restart_available);
+  if (enforcementLabel) {
+    const labels = { SIMULATED: 'Simulated ACL policy', WINDOWS: 'Windows host firewall', LINUX: 'Linux host firewall', PFCTL: 'macOS host firewall' };
+    enforcementLabel.textContent = labels[data.quarantine_backend] || 'Unknown';
+  }
+  if (backendSelect) {
+    for (const option of backendSelect.options) {
+      if (option.value !== 'SIMULATED') option.disabled = currentOperatingMode !== 'LIVE_LAN';
+    }
+    backendSelect.title = currentOperatingMode === 'LIVE_LAN' ? 'Choose a containment backend' : 'Switch to Live LAN before choosing a host firewall backend';
+  }
+}
 
 function escapeHtml(string) {
   if (!string) return '';
@@ -73,10 +187,10 @@ function openNetworkScanModal() {
   const modal = document.getElementById('network-scan-modal');
   if (modal) {
     modal.classList.remove('hidden');
-    const importBtn = document.getElementById('btn-import-scan') || document.getElementById('modal-import-btn');
-    if (importBtn) {
-      importBtn.disabled = false;
-    }
+    refreshModeStatus().catch(() => {
+      liveCaptureReady = false;
+      updateCaptureAvailability({ capture: {} });
+    });
     // Ensure network telemetry is fresh
     fetch('/api/network/info')
       .then(res => res.json())
@@ -86,7 +200,7 @@ function openNetworkScanModal() {
           const gwEl = document.getElementById('modal-scan-gateway');
           const ifEl = document.getElementById('modal-scan-iface');
           if (subEl) subEl.innerText = data.info.subnet || '192.168.1.0/24';
-          if (gwEl) gwEl.innerText = data.info.gateway_ip || '192.168.1.1';
+          if (gwEl) gwEl.innerText = data.info.gateway_ip || 'Unknown';
           if (ifEl) ifEl.innerText = data.info.interface || 'en0';
         }
       })
@@ -125,7 +239,7 @@ async function startNetworkScan() {
   if (progressBox) progressBox.classList.remove('hidden');
   if (emptyState) emptyState.classList.add('hidden');
   if (importBtn) {
-    importBtn.disabled = false;
+    importBtn.disabled = true;
     importBtn.classList.add('hidden');
   }
 
@@ -266,8 +380,7 @@ function renderDiscoveredScanList() {
   // Reveal import button with device count
   if (importBtn) {
     importBtn.classList.remove('hidden');
-    importBtn.disabled = false;
-    importBtn.innerHTML = `<i class="fa-solid fa-cloud-arrow-down text-xs mr-1.5"></i><span>Import All Devices (${discoveredScanCache.length})</span>`;
+    updateCaptureAvailability();
   }
 
   listEl.innerHTML = discoveredScanCache.map(d => {
@@ -372,6 +485,14 @@ async function importScannedDevices() {
     return;
   }
 
+  try {
+    await refreshModeStatus();
+    if (!liveCaptureReady) return;
+  } catch (e) {
+    showToast(e.message || 'Could not check capture status', 'error');
+    return;
+  }
+
   const importBtn = document.getElementById('btn-import-scan') || document.getElementById('modal-import-btn');
   if (importBtn) {
     importBtn.disabled = true;
@@ -382,7 +503,7 @@ async function importScannedDevices() {
     const res = await fetch('/api/network/import', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ devices: discoveredScanCache })
+      body: JSON.stringify({ devices: discoveredScanCache, authorization_confirmed: true })
     });
     const data = await res.json();
 
@@ -392,6 +513,7 @@ async function importScannedDevices() {
 
     currentOperatingMode = 'LIVE_LAN';
     updateModeUI('LIVE_LAN');
+    await refreshModeStatus();
     showToast(`Successfully imported ${data.imported_count} devices to live monitoring!`, 'success');
     closeNetworkScanModal();
     refreshDashboard();
@@ -401,9 +523,7 @@ async function importScannedDevices() {
     showToast('Error importing devices: ' + (e.message || e), 'error');
   } finally {
     if (importBtn) {
-      importBtn.disabled = false;
-      const count = (discoveredScanCache && discoveredScanCache.length) || 0;
-      importBtn.innerHTML = `<i class="fa-solid fa-cloud-arrow-down text-xs mr-1.5"></i><span>Import All Devices (${count})</span>`;
+      updateCaptureAvailability();
     }
   }
 }
@@ -417,27 +537,120 @@ window.probeDirectIp = probeSingleTargetIp;
  * Operating Mode Switcher (Live LAN vs Demo Lab)
  * ========================================================== */
 
-async function switchOperationMode(mode, showFeedback = true) {
+async function switchOperationMode(mode, showFeedback = true, confirmed = false) {
+  if (mode === 'LIVE_LAN') {
+    try {
+      await refreshModeStatus();
+      if (!liveCaptureReady) return;
+    } catch (e) {
+      showToast(e.message || 'Could not check capture status', 'error');
+      return;
+    }
+  }
   if (mode === 'LIVE_LAN' && !confirm('Switching to live LAN removes the academic demo inventory and starts active discovery. Continue only on a network you are authorised to assess.')) {
+    return;
+  }
+  if (mode === 'LAB_SIMULATION' && currentOperatingMode === 'LIVE_LAN' && !confirmed) {
+    await openDemoSwitchDialog();
     return;
   }
   try {
     const res = await fetch('/api/mode/switch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: mode, authorization_confirmed: mode === 'LIVE_LAN' })
+      body: JSON.stringify({ mode: mode, authorization_confirmed: true })
     });
     const data = await res.json();
+    if (!res.ok || data.status !== 'success') {
+      throw new Error(data.message || `Mode switch failed (${res.status})`);
+    }
 
     currentOperatingMode = mode;
     updateModeUI(mode);
+    await refreshModeStatus();
 
     if (showFeedback) {
       showToast(data.message || `Switched to ${mode}`, 'success');
     }
     refreshDashboard();
+    return data;
   } catch (e) {
     showToast('Failed to switch mode: ' + e, 'error');
+    return null;
+  }
+}
+
+async function openDemoSwitchDialog() {
+  try {
+    await refreshModeStatus();
+  } catch (e) {
+    showToast(e.message || 'Could not verify the current mode', 'error');
+    return;
+  }
+  if (currentOperatingMode !== 'LIVE_LAN') return;
+  const dialog = document.getElementById('demo-switch-dialog');
+  const message = document.getElementById('demo-switch-message');
+  const button = document.getElementById('demo-switch-confirm');
+  if (!dialog) return;
+  if (message && !lastModeStatus?.restart_available) {
+    message.textContent = 'This clears the live inventory and alerts and sets capture to Simulated. Restart NetGuard manually after switching to apply the capture setting.';
+  }
+  if (button && !lastModeStatus?.restart_available) button.textContent = 'Switch to Demo Lab';
+  dialog.classList.remove('hidden');
+  document.getElementById('demo-switch-cancel')?.focus();
+}
+
+function closeDemoSwitchDialog() {
+  document.getElementById('demo-switch-dialog')?.classList.add('hidden');
+  document.getElementById('btn-mode-demo')?.focus();
+}
+
+async function restartNetGuardAndWait() {
+  const response = await fetch('/api/system/restart', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ authorization_confirmed: true })
+  });
+  const result = await response.json();
+  if (!response.ok || result.status !== 'success') throw new Error(result.message || 'Restart failed');
+  for (let attempt = 0; attempt < 40; attempt++) {
+    await new Promise(resolve => setTimeout(resolve, 750));
+    try {
+      const status = await fetch('/api/mode/status', { cache: 'no-store' }).then(res => res.json());
+      if (status.status === 'success' && status.boot_id !== result.boot_id) return status;
+    } catch (_) {
+      // The launcher is replacing the server.
+    }
+  }
+  throw new Error('NetGuard is taking longer to restart. Refresh this page shortly.');
+}
+
+async function confirmDemoSwitch() {
+  const button = document.getElementById('demo-switch-confirm');
+  const message = document.getElementById('demo-switch-message');
+  if (!button) return;
+  button.disabled = true;
+  button.textContent = demoSwitchPendingRestart ? 'Restarting...' : 'Switching...';
+  try {
+    if (!demoSwitchPendingRestart) {
+      const switched = await switchOperationMode('LAB_SIMULATION', false, true);
+      if (!switched) throw new Error('Could not switch to the demo lab');
+      demoSwitchPendingRestart = switched.restart_required;
+    }
+    if (demoSwitchPendingRestart && lastModeStatus?.restart_available) {
+      button.textContent = 'Restarting...';
+      await restartNetGuardAndWait();
+      window.location.reload();
+      return;
+    }
+    closeDemoSwitchDialog();
+    showToast(demoSwitchPendingRestart ? 'Demo Lab loaded. Restart NetGuard to apply Simulated capture.' : 'Demo Lab loaded.', demoSwitchPendingRestart ? 'warning' : 'success');
+  } catch (e) {
+    if (message) message.textContent = `${e.message || e}. ${demoSwitchPendingRestart ? 'The Demo Lab setting is saved; retry the restart.' : 'No settings were changed.'}`;
+    showToast(e.message || 'Demo switch failed', 'error');
+  } finally {
+    button.disabled = false;
+    button.textContent = demoSwitchPendingRestart ? 'Retry Restart' : 'Switch and Restart';
   }
 }
 
@@ -447,19 +660,36 @@ function updateModeUI(mode) {
   const envTitle = document.getElementById('active-env-title');
   const envBadge = document.getElementById('active-mode-badge');
   const envSub = document.getElementById('active-env-subtitle');
+  const labOnly = mode !== 'LAB_SIMULATION';
+  const labNotice = document.getElementById('lab-mode-notice');
+  if (labNotice) labNotice.classList.toggle('hidden', !labOnly);
+  document.querySelectorAll('[onclick^="runDemoStep("], [onclick^="triggerSpecificAttack("], [onclick^="quickResetDemo("]').forEach(button => {
+    button.disabled = labOnly;
+    button.title = labOnly ? 'Switch to Academic Demo Lab to run synthetic scenarios' : '';
+    button.classList.toggle('opacity-50', labOnly);
+    button.classList.toggle('cursor-not-allowed', labOnly);
+  });
+
+  const baseModeClasses = 'mode-select-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition inline-flex items-center gap-1.5';
+  if (btnDemo) {
+    const selected = mode !== 'LIVE_LAN';
+    btnDemo.className = `${baseModeClasses} ${selected ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`;
+    btnDemo.setAttribute('aria-pressed', String(selected));
+  }
+  if (btnLive) {
+    const selected = mode === 'LIVE_LAN';
+    btnLive.className = `${baseModeClasses} ${selected ? 'bg-emerald-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`;
+    btnLive.setAttribute('aria-pressed', String(selected));
+  }
 
   if (mode === 'LIVE_LAN') {
-    btnLive?.classList.add('active');
-    btnDemo?.classList.remove('active');
     if (envTitle) envTitle.innerText = 'Live LAN monitoring';
     if (envBadge) {
       envBadge.innerText = 'LIVE INVENTORY';
       envBadge.className = 'px-2 py-0.2 rounded-full text-[10px] font-mono font-bold bg-emerald-950/90 text-emerald-400 border border-emerald-800/60';
     }
-    if (envSub) envSub.innerText = 'Inventory was discovered on the local LAN. Active discovery and port checks require authorisation.';
+    if (envSub) envSub.innerText = 'Inventory was discovered on the local LAN. Capture coverage depends on the monitoring interface and network position.';
   } else {
-    btnDemo?.classList.add('active');
-    btnLive?.classList.remove('active');
     if (envTitle) envTitle.innerText = 'Academic demonstration lab';
     if (envBadge) {
       envBadge.innerText = 'SIMULATED DATA';
@@ -485,8 +715,13 @@ async function pingDevice(deviceId, ip) {
     const data = await res.json();
     if (data.status === 'success') {
       showToast(`Ping to ${ip}: ${data.latency_ms} ms round-trip`, 'success');
+      measuredLatencies.set(deviceId, data.latency_ms);
       const latEl = document.getElementById(`dev-lat-${deviceId}`);
-      if (latEl) latEl.innerText = `🟢 ${data.latency_ms}ms`;
+      if (latEl) {
+        latEl.textContent = `${data.latency_ms} ms`;
+        latEl.classList.replace('text-slate-400', 'text-emerald-400');
+        latEl.title = 'Measured by ping in this browser session';
+      }
     } else {
       showToast(`Ping to ${ip} failed`, 'warning');
     }
@@ -529,6 +764,7 @@ async function quickResetDemo() {
   try {
     const res = await fetch('/api/simulation/reset', { method: 'POST' });
     const data = await res.json();
+    if (!res.ok || data.status !== 'success') throw new Error(data.message || 'Reset failed');
     showToast(data.message || 'Environment reset to baseline', 'success');
     refreshDashboard();
   } catch (e) {
@@ -809,6 +1045,7 @@ function renderDeviceTable(devices) {
       brandName = d.vendor || 'Apple Device';
     }
 
+    const measuredLatency = measuredLatencies.get(d.id);
     let riskBarGradient = 'from-emerald-500 to-teal-400';
     if (d.status === 'Critical' || d.current_risk_score >= 70) riskBarGradient = 'from-rose-500 to-red-600';
     else if (d.status === 'Suspicious' || d.current_risk_score >= 40) riskBarGradient = 'from-amber-500 to-orange-500';
@@ -854,8 +1091,8 @@ function renderDeviceTable(devices) {
 
         <!-- Live Latency -->
         <td class="py-3 px-4 font-mono">
-          <span id="dev-lat-${d.id}" class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-900 border border-slate-800 text-emerald-400">
-            🟢 0.2ms
+          <span id="dev-lat-${d.id}" title="${measuredLatency == null ? 'Use the Ping action to measure latency' : 'Measured by ping in this browser session'}" class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-900 border border-slate-800 ${measuredLatency == null ? 'text-slate-400' : 'text-emerald-400'}">
+            ${measuredLatency == null ? 'Not measured' : `${measuredLatency} ms`}
           </span>
         </td>
 
@@ -887,29 +1124,29 @@ function renderDeviceTable(devices) {
 
         <!-- Device actions -->
         <td class="py-3 px-4 text-right">
-          <div class="flex items-center justify-end space-x-1.5">
+          <div class="flex items-center justify-end gap-1.5 whitespace-nowrap">
             <!-- Ping Button -->
-            <button onclick="pingDevice(${d.id}, '${d.ip}')" aria-label="Ping ${escapeHtml(d.name)}" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-emerald-400 border border-slate-700 transition" title="Ping device">
+            <button onclick="pingDevice(${d.id}, '${d.ip}')" aria-label="Ping ${escapeHtml(d.name)}" class="device-action rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-emerald-400 border border-slate-700 transition" title="Ping device">
               <i class="fa-solid fa-bolt text-xs"></i>
             </button>
             
             <!-- Port Scan Button -->
-            <button onclick="portScanDevice(${d.id}, '${d.ip}')" aria-label="Check ports on ${escapeHtml(d.name)}" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-blue-400 border border-slate-700 transition" title="Check standard ports">
+            <button onclick="portScanDevice(${d.id}, '${d.ip}')" aria-label="Check ports on ${escapeHtml(d.name)}" class="device-action rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-blue-400 border border-slate-700 transition" title="Check standard ports">
               <i class="fa-solid fa-satellite-dish text-xs"></i>
             </button>
 
             <!-- Inspect Button -->
-            <a href="/device/${d.id}" aria-label="Inspect ${escapeHtml(d.name)}" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-blue-400 border border-slate-700 transition" title="Inspect behavioural profile">
+            <a href="/device/${d.id}" aria-label="Inspect ${escapeHtml(d.name)}" class="device-action rounded-lg bg-slate-800 hover:bg-slate-700 text-blue-400 border border-slate-700 transition" title="Inspect behavioural profile">
               <i class="fa-solid fa-chart-line text-xs"></i>
             </a>
 
             <!-- Quarantine Toggle -->
             ${d.is_quarantined ? `
-              <button onclick="releaseDevice(${d.id})" aria-label="Release ${escapeHtml(d.name)} from quarantine" class="p-1.5 rounded-lg bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-800 transition" title="Release from quarantine">
+              <button onclick="releaseDevice(${d.id})" aria-label="Release ${escapeHtml(d.name)} from quarantine" class="device-action rounded-lg bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-800 transition" title="Release from quarantine">
                 <i class="fa-solid fa-unlock text-xs"></i>
               </button>
             ` : `
-              <button onclick="quarantineDevicePrompt(${d.id})" aria-label="Quarantine ${escapeHtml(d.name)}" class="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-700 transition" title="Quarantine host">
+              <button onclick="quarantineDevicePrompt(${d.id})" aria-label="Quarantine ${escapeHtml(d.name)}" class="device-action rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-700 transition" title="Quarantine host">
                 <i class="fa-solid fa-ban text-xs"></i>
               </button>
             `}
@@ -927,6 +1164,11 @@ function renderDeviceTable(devices) {
 function renderLiveAlertFeed(alerts) {
   const container = document.getElementById('live-alert-feed');
   if (!container) return;
+  const renderKey = JSON.stringify(alerts.map(a => [a.id, a.indicator, a.severity, a.message, a.timestamp, a.device_id]));
+  if (container.dataset.renderKey === renderKey) return;
+  const priorScrollTop = container.scrollTop;
+  const priorScrollHeight = container.scrollHeight;
+  container.dataset.renderKey = renderKey;
 
   if (alerts.length === 0) {
     container.innerHTML = `
@@ -956,34 +1198,38 @@ function renderLiveAlertFeed(alerts) {
   container.innerHTML = alerts.map(a => {
     let iconClass = 'fa-solid fa-triangle-exclamation text-rose-400';
     let pillColor = 'badge-high';
-    if (a.severity === 'Medium') {
+    if (a.severity === 'Low') {
+      iconClass = 'fa-solid fa-circle-info text-sky-400';
+      pillColor = 'badge-info';
+    } else if (a.severity === 'Medium') {
       iconClass = 'fa-solid fa-circle-exclamation text-amber-400';
       pillColor = 'badge-medium';
     }
 
     return `
       <div class="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-center justify-between text-xs hover:border-slate-700 transition">
-        <div class="flex items-center space-x-3 truncate">
+        <div class="flex items-center space-x-3 min-w-0">
           <div class="w-7 h-7 rounded-lg bg-slate-900 flex items-center justify-center shrink-0">
             <i class="${iconClass} text-xs"></i>
           </div>
-          <div class="truncate">
-            <div class="flex items-center space-x-2">
-              <span class="font-bold text-white">${escapeHtml(a.indicator)}</span>
-              <span class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase ${pillColor}">${a.severity}</span>
+          <div class="min-w-0">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="font-bold text-white truncate">${escapeHtml(a.indicator)}</span>
+              <span class="shrink-0 px-1.5 py-0.2 rounded text-[9px] font-bold uppercase ${pillColor}">${escapeHtml(a.severity)}</span>
               <span class="text-[10px] text-slate-500 font-mono">• ${new Date(a.timestamp).toLocaleTimeString()}</span>
             </div>
             <p class="text-[11px] text-slate-400 truncate mt-0.5">${escapeHtml(a.message)}</p>
           </div>
         </div>
         <div class="shrink-0 ml-3">
-          <a href="/device/${a.device_id}" class="px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-cyan-950 text-cyan-400 text-[11px] border border-slate-700/60 font-semibold">
+          <a href="/device/${a.device_id}" class="inline-flex items-center min-h-9 px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-cyan-950 text-cyan-400 text-[11px] border border-slate-700/60 font-semibold">
             Inspect &rarr;
           </a>
         </div>
       </div>
     `;
   }).join('');
+  container.scrollTop = priorScrollTop < 8 ? 0 : priorScrollTop + container.scrollHeight - priorScrollHeight;
 }
 
 function initDashboard() {
@@ -1021,6 +1267,11 @@ document.addEventListener('click', (e) => {
 // Ensure floating LAN telemetry is loaded across all pages
 document.addEventListener('DOMContentLoaded', () => {
   loadNetworkInfo();
+  refreshModeStatus()
+    .catch(() => {
+      liveCaptureReady = false;
+      updateCaptureAvailability({ capture: {} });
+    });
 });
 
 // Dismiss modal on Escape key
@@ -1037,6 +1288,3 @@ document.addEventListener('click', (e) => {
     closeNetworkScanModal();
   }
 });
-
-
-
