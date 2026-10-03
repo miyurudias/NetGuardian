@@ -1,0 +1,4 @@
+# NetGuard Dependencies
+# Compatible with Python 3.9+ on Windows, macOS, and Linux
+Flask>=3.0.0
+scapy>=2.5.0

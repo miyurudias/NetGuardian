@@ -1,0 +1,374 @@
+{% extends "base.html" %}
+{% set active_page = "quarantine" %}
+
+{% block title %}Threat Isolation & Quarantine | NetGuard{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Banner -->
+  <div class="cyber-card surface-header p-6 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-slate-800 bg-[#0F1626]">
+    <div class="flex items-center space-x-3.5">
+      <div class="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-rose-400">
+        <i class="fa-solid fa-ban text-base"></i>
+      </div>
+      <div>
+        <div class="flex items-center space-x-2">
+          <h1 class="text-lg font-bold text-white tracking-tight">Threat Isolation & Policy Center</h1>
+          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-950 text-purple-300 border border-purple-800/60">
+            LAB POLICY VIEW
+          </span>
+        </div>
+        <p class="text-xs text-slate-400 mt-0.5">Review isolation decisions, audit history, and policy previews before controlled enforcement.</p>
+      </div>
+    </div>
+
+    <div class="flex items-center space-x-2.5">
+      <button onclick="loadQuarantineData()" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs border border-slate-700 transition" title="Refresh Quarantine Status">
+        <i class="fa-solid fa-rotate text-xs"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Main 2-Column Console -->
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+    <!-- Left Column (7 Spans): Active Threat Isolation Chamber -->
+    <div class="lg:col-span-7 cyber-card p-6 rounded-2xl border border-slate-800 bg-[#0F1626] flex flex-col space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center space-x-2.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+          <h2 class="text-xs font-bold text-white uppercase tracking-wider">Current isolation state</h2>
+        </div>
+        <span id="isolated-count-badge" class="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-slate-800 text-slate-300 border border-slate-700">
+          0 Devices Isolated
+        </span>
+      </div>
+
+      <!-- Isolated Devices Grid or Authoritative Clear State -->
+      <div id="isolated-devices-container" class="space-y-3">
+        <div class="text-center py-12 text-slate-500 text-xs">
+          <i class="fa-solid fa-spinner fa-spin text-blue-500 text-xl mb-2"></i>
+          <p>Loading isolation telemetry...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column (5 Spans): Multi-Platform Router ACL & Firewall Generator -->
+    <div class="lg:col-span-5 cyber-card p-6 rounded-2xl border border-slate-800 bg-[#0F1626] flex flex-col space-y-3">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center space-x-2">
+          <i class="fa-solid fa-terminal text-blue-400 text-xs"></i>
+          <h3 class="text-xs font-bold text-white uppercase tracking-wider">ACL and firewall policy preview</h3>
+        </div>
+        <button onclick="copyCurrentScript()" class="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center space-x-1 transition">
+          <i class="fa-solid fa-copy text-[11px]"></i>
+          <span>Copy Script</span>
+        </button>
+      </div>
+
+      <!-- Platform Selector Tabs (Redesigned Enterprise Segmented Controller) -->
+      <div class="p-1.5 bg-[#090E1A] rounded-xl border border-slate-800/90 shadow-inner">
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+          <button type="button" onclick="selectPlatform('cisco')" id="tab-cisco"
+                  class="platform-tab px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-center space-x-2 transition-all duration-200 bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-md shadow-blue-600/30 border border-cyan-400/30">
+            <i class="fa-solid fa-server text-[11px]"></i>
+            <span>Cisco IOS</span>
+          </button>
+
+          <button type="button" onclick="selectPlatform('mikrotik')" id="tab-mikrotik"
+                  class="platform-tab px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-center space-x-2 transition-all duration-200 bg-slate-900/60 hover:bg-slate-800/80 text-slate-400 hover:text-slate-200 border border-slate-800/60">
+            <i class="fa-solid fa-network-wired text-[11px] text-cyan-400"></i>
+            <span>MikroTik</span>
+          </button>
+
+          <button type="button" onclick="selectPlatform('iptables')" id="tab-iptables"
+                  class="platform-tab px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-center space-x-2 transition-all duration-200 bg-slate-900/60 hover:bg-slate-800/80 text-slate-400 hover:text-slate-200 border border-slate-800/60">
+            <i class="fa-brands fa-linux text-[11px] text-amber-400"></i>
+            <span>iptables</span>
+          </button>
+
+          <button type="button" onclick="selectPlatform('windows')" id="tab-windows"
+                  class="platform-tab px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-center space-x-2 transition-all duration-200 bg-slate-900/60 hover:bg-slate-800/80 text-slate-400 hover:text-slate-200 border border-slate-800/60">
+            <i class="fa-brands fa-windows text-[11px] text-sky-400"></i>
+            <span>Windows</span>
+          </button>
+
+          <button type="button" onclick="selectPlatform('pfctl')" id="tab-pfctl"
+                  class="platform-tab px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-center space-x-2 transition-all duration-200 bg-slate-900/60 hover:bg-slate-800/80 text-slate-400 hover:text-slate-200 border border-slate-800/60">
+            <i class="fa-brands fa-apple text-[11px] text-slate-300"></i>
+            <span>macOS pf</span>
+          </button>
+
+          <button type="button" onclick="selectPlatform('json')" id="tab-json"
+                  class="platform-tab px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-center space-x-2 transition-all duration-200 bg-slate-900/60 hover:bg-slate-800/80 text-slate-400 hover:text-slate-200 border border-slate-800/60">
+            <i class="fa-solid fa-code text-[11px] text-indigo-400"></i>
+            <span>REST JSON</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Real-time Script Terminal Box -->
+      <div class="relative">
+        <pre id="active-acl-script" class="acl-code-block p-4 rounded-xl text-xs overflow-x-auto min-h-[220px] max-h-[300px] font-mono leading-relaxed select-all">! NetGuard Multi-Platform Enforcement Subsystem
+! Evaluating live network policies...</pre>
+      </div>
+
+      <div class="p-2.5 rounded-lg bg-slate-900 border border-slate-800/80 text-[11px] text-slate-400 flex items-start space-x-2">
+        <i class="fa-solid fa-circle-info text-blue-400 mt-0.5 shrink-0 text-xs"></i>
+        <span>Policy text is generated from the current lab state. Copying it does not apply it to a router or firewall.</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Quarantine Audit Trail / History -->
+  <div class="cyber-card rounded-2xl overflow-hidden border border-slate-800 bg-[#0F1626]">
+    <div class="p-5 border-b border-slate-800 flex items-center justify-between">
+      <div>
+        <h3 class="text-xs font-bold text-white uppercase tracking-wider flex items-center">
+          <i class="fa-solid fa-clock-rotate-left text-blue-400 mr-2"></i> Quarantine Enforcement Audit History
+        </h3>
+        <p class="text-[11px] text-slate-400 mt-0.5">Chronological record of automated and administrator-initiated containment decisions</p>
+      </div>
+      <span class="text-[11px] font-mono text-slate-400">Tamper-evident log</span>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-950/60 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800 text-[11px]">
+          <tr>
+            <th class="py-3 px-4">Timestamp</th>
+            <th class="py-3 px-4">Target Host</th>
+            <th class="py-3 px-4">Enforcement Action</th>
+            <th class="py-3 px-4">Firewall Subsystem</th>
+            <th class="py-3 px-4">Trigger Reason / Empirical Rationale</th>
+          </tr>
+        </thead>
+        <tbody id="quarantine-log-tbody" class="divide-y divide-slate-800/50 font-mono">
+          <!-- Populated dynamically via JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let currentPlatform = 'cisco';
+  let cachedQuarantined = [];
+
+  async function loadQuarantineData() {
+    try {
+      const [devRes, logRes] = await Promise.all([
+        fetch('/api/devices'),
+        fetch('/api/quarantine/logs')
+      ]);
+      const devData = await devRes.json();
+      const logData = await logRes.json();
+
+      cachedQuarantined = (devData.devices || []).filter(d => d.is_quarantined);
+      const isolatedContainer = document.getElementById('isolated-devices-container');
+      const countBadge = document.getElementById('isolated-count-badge');
+
+      if (countBadge) {
+        countBadge.innerText = `${cachedQuarantined.length} Device${cachedQuarantined.length === 1 ? '' : 's'} Isolated`;
+        if (cachedQuarantined.length > 0) {
+          countBadge.className = 'px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-rose-950 text-rose-300 border border-rose-800';
+        } else {
+          countBadge.className = 'px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-slate-800 text-slate-300 border border-slate-700';
+        }
+      }
+
+      if (cachedQuarantined.length === 0) {
+        isolatedContainer.innerHTML = `
+          <div class="py-10 px-4 flex flex-col items-center text-center space-y-3">
+            <div class="w-16 h-16 rounded-2xl bg-emerald-950/70 border border-emerald-500/30 flex items-center justify-center shadow-lg shadow-emerald-950/60 ring-1 ring-emerald-500/20">
+              <svg class="w-8 h-8 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                <path d="m9 12 2 2 4-4"/>
+              </svg>
+            </div>
+            <div>
+              <h4 class="text-sm font-bold text-white tracking-wide">Zero Compromised Hosts Isolated</h4>
+              <p class="text-xs text-slate-400 mt-1 max-w-md leading-relaxed">
+                All monitored devices are within the configured thresholds. A critical score can trigger the configured lab isolation workflow.
+              </p>
+            </div>
+            <div class="pt-2">
+              <a href="/devices" class="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition flex items-center space-x-1.5">
+                <i class="fa-solid fa-network-wired text-blue-400"></i>
+                <span>View All Monitored Endpoints</span>
+              </a>
+            </div>
+          </div>
+        `;
+      } else {
+        isolatedContainer.innerHTML = cachedQuarantined.map(dev => `
+          <div class="p-4 rounded-xl bg-rose-950/20 border border-rose-800/70 flex flex-col justify-between space-y-3 shadow-lg">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="flex items-center space-x-2">
+                  <span class="text-sm font-bold text-white">${escapeHtml(dev.name)}</span>
+                  <span class="px-2 py-0.2 rounded-full text-[9px] uppercase font-bold badge-high">ISOLATED</span>
+                </div>
+                <div class="font-mono text-xs text-rose-300 mt-1">IP: ${dev.ip} &bull; MAC: ${dev.mac}</div>
+              </div>
+              <span class="text-xs font-mono text-rose-400 font-bold bg-rose-950 px-2 py-0.5 rounded border border-rose-800">
+                Risk: ${dev.current_risk_score}/100
+              </span>
+            </div>
+
+            <div class="text-xs text-slate-300 bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
+              <strong class="text-rose-400">Isolation Trigger:</strong> ${escapeHtml(dev.quarantine_reason || 'Critical Behavioral Anomaly')}
+            </div>
+
+            <div class="flex items-center justify-between pt-2 border-t border-rose-900/40">
+              <a href="/device/${dev.id}" class="text-xs text-blue-400 hover:underline font-semibold flex items-center space-x-1">
+                <span>Forensics</span>
+                <i class="fa-solid fa-arrow-right text-[10px]"></i>
+              </a>
+              <button onclick="releaseDevice(${dev.id})" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition flex items-center space-x-1.5">
+                <i class="fa-solid fa-unlock text-[10px]"></i>
+                <span>Release & Restore</span>
+              </button>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      renderScript();
+
+      // Render logs
+      const tbody = document.getElementById('quarantine-log-tbody');
+      if (tbody) {
+        const logs = logData.logs || [];
+        if (logs.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-500 font-sans text-xs">No quarantine actions recorded yet.</td></tr>`;
+        } else {
+          tbody.innerHTML = logs.map(log => {
+            const isBlock = (log.action || '').toUpperCase().includes('QUARANTINE') || (log.action || '').toUpperCase().includes('BLOCK');
+            return `
+              <tr class="hover:bg-slate-800/30 transition">
+                <td class="py-2.5 px-4 text-slate-400 text-xs">${new Date(log.timestamp).toLocaleTimeString()}</td>
+                <td class="py-2.5 px-4 font-semibold text-white font-sans text-xs">${escapeHtml(log.device_name || 'Host')} <span class="text-slate-500 font-mono text-[11px]">(${log.device_ip})</span></td>
+                <td class="py-2.5 px-4">
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${isBlock ? 'bg-rose-950 text-rose-400 border border-rose-800' : 'bg-emerald-950 text-emerald-400 border border-emerald-800'}">
+                    ${escapeHtml(log.action)}
+                  </span>
+                </td>
+                <td class="py-2.5 px-4 text-slate-300 text-xs">${escapeHtml(log.mechanism || 'Cisco IOS ACL')}</td>
+                <td class="py-2.5 px-4 text-slate-400 font-sans text-xs max-w-md truncate" title="${escapeHtml(log.reason)}">${escapeHtml(log.reason)}</td>
+              </tr>
+            `;
+          }).join('');
+        }
+      }
+
+    } catch (e) {
+      console.error('Error loading quarantine data:', e);
+    }
+  }
+
+  const ACTIVE_TAB_CLASSES = ['bg-gradient-to-r', 'from-blue-600', 'to-cyan-600', 'text-white', 'font-semibold', 'shadow-md', 'shadow-blue-600/30', 'border-cyan-400/30'];
+  const INACTIVE_TAB_CLASSES = ['bg-slate-900/60', 'hover:bg-slate-800/80', 'text-slate-400', 'hover:text-slate-200', 'border-slate-800/60'];
+
+  function selectPlatform(plat) {
+    currentPlatform = plat;
+    document.querySelectorAll('.platform-tab').forEach(b => {
+      b.classList.remove(...ACTIVE_TAB_CLASSES);
+      b.classList.add(...INACTIVE_TAB_CLASSES);
+    });
+    const active = document.getElementById(`tab-${plat}`);
+    if (active) {
+      active.classList.remove(...INACTIVE_TAB_CLASSES);
+      active.classList.add(...ACTIVE_TAB_CLASSES);
+    }
+    renderScript();
+  }
+
+  function renderScript() {
+    const aclScript = document.getElementById('active-acl-script');
+    if (!aclScript) return;
+
+    if (cachedQuarantined.length === 0) {
+      if (currentPlatform === 'cisco') {
+        aclScript.innerText = `! NetGuard Cisco IOS policy preview\n! Quarantine table status: ALL CLEAR (0 hosts isolated)\n!\nip access-list extended NETGUARD-QUARANTINE\n  permit ip any any\n!\ninterface GigabitEthernet0/1\n  ip access-group NETGUARD-QUARANTINE in`;
+      } else if (currentPlatform === 'mikrotik') {
+        aclScript.innerText = `# NetGuard MikroTik RouterOS Enforcement\n# Status: ALL CLEAR\n/ip firewall filter\nremove [find comment="NetGuard-Quarantine"]\n# No drop rules currently engaged.`;
+      } else if (currentPlatform === 'iptables') {
+        aclScript.innerText = `# NetGuard Linux iptables Enforcement\n# Status: ALL CLEAR\niptables -F NETGUARD_ISOLATE 2>/dev/null || true\niptables -A INPUT -j ACCEPT`;
+      } else if (currentPlatform === 'windows') {
+        aclScript.innerText = `REM NetGuard Windows Defender Firewall Enforcement\nREM Status: ALL CLEAR\nnetsh advfirewall firewall delete rule name="NetGuard-Quarantine"`;
+      } else if (currentPlatform === 'pfctl') {
+        aclScript.innerText = `# NetGuard macOS / BSD Packet Filter (pfctl)\n# Status: ALL CLEAR\ntable <netguard_quarantine> { }\npass in quick on en0 from any to any`;
+      } else {
+        aclScript.innerText = JSON.stringify({ status: "CLEAR", isolated_count: 0, policy: "PERMIT_ALL", timestamp: new Date().toISOString() }, null, 2);
+      }
+      return;
+    }
+
+    // Isolated rules
+    if (currentPlatform === 'cisco') {
+      let code = `! NetGuard Cisco IOS Extended Access-List\n! ACTIVE THREAT CONTAINMENT ENGAGED (${cachedQuarantined.length} hosts blocked):\n!\nip access-list extended NETGUARD-QUARANTINE\n`;
+      cachedQuarantined.forEach((d, idx) => {
+        code += `  ${10 + (idx * 10)} deny ip host ${d.ip} any log  ! ${d.name} (${d.mac})\n`;
+      });
+      code += `  999 permit ip any any\n!\ninterface GigabitEthernet0/1\n  ip access-group NETGUARD-QUARANTINE in`;
+      aclScript.innerText = code;
+    } else if (currentPlatform === 'mikrotik') {
+      let code = `# NetGuard MikroTik RouterOS Firewall Rules\n/ip firewall filter\nremove [find comment="NetGuard-Quarantine"]\n`;
+      cachedQuarantined.forEach(d => {
+        code += `/ip firewall filter add chain=forward src-address=${d.ip} action=drop comment="NetGuard-Quarantine"\n`;
+      });
+      aclScript.innerText = code;
+    } else if (currentPlatform === 'iptables') {
+      let code = `# NetGuard Linux Host / Gateway iptables Rules\niptables -N NETGUARD_ISOLATE 2>/dev/null || true\niptables -F NETGUARD_ISOLATE\n`;
+      cachedQuarantined.forEach(d => {
+        code += `iptables -I NETGUARD_ISOLATE -s ${d.ip} -j DROP\n`;
+      });
+      code += `iptables -I FORWARD -j NETGUARD_ISOLATE`;
+      aclScript.innerText = code;
+    } else if (currentPlatform === 'windows') {
+      let ips = cachedQuarantined.map(d => d.ip).join(',');
+      aclScript.innerText = `REM NetGuard Windows Advanced Firewall Policy\nnetsh advfirewall firewall delete rule name="NetGuard-Quarantine"\nnetsh advfirewall firewall add rule name="NetGuard-Quarantine" dir=in action=block remoteip=${ips} enable=yes`;
+    } else if (currentPlatform === 'pfctl') {
+      let ipList = cachedQuarantined.map(d => d.ip).join(', ');
+      aclScript.innerText = `# NetGuard macOS / BSD pfctl Rules\ntable <netguard_quarantine> { ${ipList} }\nblock in quick on en0 from <netguard_quarantine> to any`;
+    } else {
+      aclScript.innerText = JSON.stringify({
+        status: "THREAT_CONTAINMENT",
+        isolated_hosts: cachedQuarantined.map(d => ({ ip: d.ip, mac: d.mac, name: d.name, risk: d.current_risk_score })),
+        timestamp: new Date().toISOString()
+      }, null, 2);
+    }
+  }
+
+  function copyCurrentScript() {
+    const text = document.getElementById('active-acl-script')?.innerText || '';
+    copyToClipboard(text, `${currentPlatform.toUpperCase()} Script`);
+  }
+
+  async function releaseDevice(deviceId) {
+    try {
+      const res = await fetch(`/api/devices/${deviceId}/release`, { method: 'POST' });
+      const data = await res.json();
+      if (data.status === 'success') {
+        showToast('Device released and access restored', 'success');
+        loadQuarantineData();
+      } else {
+        showToast(data.message || 'Failed to release device', 'error');
+      }
+    } catch (e) {
+      showToast('Error releasing device', 'error');
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    loadQuarantineData();
+    setInterval(loadQuarantineData, 5000);
+  });
+</script>
+{% endblock %}

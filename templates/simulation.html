@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% set active_page = "simulation" %}
+
+{% block title %}Live Demonstration Lab | NetGuard{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header -->
+  <div class="cyber-card p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-slate-800/80 bg-gradient-to-r from-slate-950 via-[#0a1224] to-slate-950">
+    <div>
+      <div class="flex items-center space-x-2.5">
+        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-950 text-cyan-400 border border-cyan-800/60">
+          SECTION 15 COMPLIANT
+        </span>
+        <h1 class="text-lg font-bold text-white tracking-tight">Controlled Attack Lab & Viva Demonstration Deck</h1>
+      </div>
+      <p class="text-xs text-slate-400 mt-1">Interactive testing suite for the Cardiff Metropolitan University / ICBT viva examination</p>
+    </div>
+
+    <!-- Quick Reset Button -->
+    <button onclick="quickResetDemo()" class="px-3.5 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700/80 transition flex items-center space-x-1.5 shadow-sm">
+      <i class="fa-solid fa-rotate-left text-cyan-400"></i>
+      <span>Reset Clean Baseline</span>
+    </button>
+  </div>
+
+  <!-- Primary 4-Phase Live Demonstration Flow (Section 15 of Proposal) -->
+  <div class="cyber-card p-6 rounded-2xl border border-cyan-900/60 bg-gradient-to-b from-[#0b1426] to-[#070b16]">
+    <div class="flex items-center justify-between mb-4 border-b border-slate-800/80 pb-3">
+      <div>
+        <h2 class="text-sm font-bold text-white flex items-center">
+          <i class="fa-solid fa-play text-emerald-400 mr-2"></i> 4-Phase Viva Presentation Sequence
+        </h2>
+        <p class="text-xs text-slate-400 mt-0.5">Step through the complete threat lifecycle in real-time in front of examiners</p>
+      </div>
+      <span class="text-xs font-mono text-cyan-400 font-semibold">Primary Target: Laptop 02 (192.168.1.45)</span>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      
+      <!-- Step 1 -->
+      <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 flex flex-col justify-between space-y-3 hover:border-cyan-700 transition">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-cyan-400 font-mono">PHASE 01</span>
+          <span class="px-2 py-0.2 rounded text-[9px] bg-emerald-950 text-emerald-400 font-bold">BASELINE</span>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-white">Normal Baseline</h3>
+          <p class="text-[11px] text-slate-400 mt-1">Seeds 5 devices with normal baselines. All devices show Low risk (Green).</p>
+        </div>
+        <button onclick="runDemoStep(1)" id="btn-step-1" class="w-full py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition shadow-md shadow-cyan-600/25">
+          <i class="fa-solid fa-circle-play mr-1.5"></i> 1. Run Baseline
+        </button>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 flex flex-col justify-between space-y-3 hover:border-amber-600 transition">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-amber-400 font-mono">PHASE 02</span>
+          <span class="px-2 py-0.2 rounded text-[9px] bg-amber-950 text-amber-400 font-bold">+30 SCAN</span>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-white">Port Scan Attack</h3>
+          <p class="text-[11px] text-slate-400 mt-1">Laptop 02 scans 30 LAN ports. Risk score jumps to ~50; status becomes Suspicious (Amber).</p>
+        </div>
+        <button onclick="runDemoStep(2)" id="btn-step-2" class="w-full py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition shadow-md shadow-amber-600/25">
+          <i class="fa-solid fa-satellite-dish mr-1.5"></i> 2. Trigger Scan
+        </button>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 flex flex-col justify-between space-y-3 hover:border-rose-600 transition">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-rose-400 font-mono">PHASE 03</span>
+          <span class="px-2 py-0.2 rounded text-[9px] bg-rose-950 text-rose-400 font-bold font-mono">AUTO-BLOCK</span>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-white">Escalate & Isolate</h3>
+          <p class="text-[11px] text-slate-400 mt-1">DNS tunneling + C2 triggers. Score crosses 70 (Critical) &rarr; NetGuard isolates host!</p>
+        </div>
+        <button onclick="runDemoStep(3)" id="btn-step-3" class="w-full py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition shadow-md shadow-rose-600/25">
+          <i class="fa-solid fa-bolt mr-1.5"></i> 3. Escalate Risk
+        </button>
+      </div>
+
+      <!-- Step 4 -->
+      <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 flex flex-col justify-between space-y-3 hover:border-emerald-600 transition">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-emerald-400 font-mono">PHASE 04</span>
+          <span class="px-2 py-0.2 rounded text-[9px] bg-emerald-950 text-emerald-400 font-bold">REMEDIATION</span>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-white">Admin Unblock</h3>
+          <p class="text-[11px] text-slate-400 mt-1">Administrator reviews audit trail, releases Laptop 02, and restores normal monitoring.</p>
+        </div>
+        <button onclick="runDemoStep(4)" id="btn-step-4" class="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-md shadow-emerald-600/25">
+          <i class="fa-solid fa-unlock mr-1.5"></i> 4. Unblock Host
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Individual Scenario Triggers -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    
+    <!-- Scenario A: Port Scan -->
+    <div class="cyber-card p-4 rounded-2xl flex flex-col justify-between">
+      <div>
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-white">Reconnaissance Port Scan</span>
+          <span class="text-xs font-mono font-bold text-cyan-400">+30</span>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-1">Probes 30 standard TCP ports (FTP, SSH, Telnet, HTTP, SMB, RDP) from Laptop 02.</p>
+      </div>
+      <button onclick="triggerSpecificAttack('port_scan')" class="mt-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-white border border-slate-700 font-semibold transition">
+        Inject Port Scan
+      </button>
+    </div>
+
+    <!-- Scenario B: DNS Anomaly -->
+    <div class="cyber-card p-4 rounded-2xl flex flex-col justify-between">
+      <div>
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-white">DNS Tunneling / Data Surge</span>
+          <span class="text-xs font-mono font-bold text-cyan-400">+20</span>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-1">Sends 120 rapid high-entropy subdomain requests simulating DNS data exfiltration.</p>
+      </div>
+      <button onclick="triggerSpecificAttack('dns')" class="mt-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-white border border-slate-700 font-semibold transition">
+        Inject DNS Anomaly
+      </button>
+    </div>
+
+    <!-- Scenario C: Unfamiliar Destinations -->
+    <div class="cyber-card p-4 rounded-2xl flex flex-col justify-between">
+      <div>
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-white">Unfamiliar External C2 Nodes</span>
+          <span class="text-xs font-mono font-bold text-cyan-400">+15</span>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-1">Initiates outbound connections to 12 untrusted foreign IP destinations.</p>
+      </div>
+      <button onclick="triggerSpecificAttack('dest')" class="mt-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-white border border-slate-700 font-semibold transition">
+        Inject New Destinations
+      </button>
+    </div>
+
+    <!-- Scenario D: Traffic Spike -->
+    <div class="cyber-card p-4 rounded-2xl flex flex-col justify-between">
+      <div>
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-white">Data Exfiltration Spike</span>
+          <span class="text-xs font-mono font-bold text-cyan-400">+15</span>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-1">Transfers 3.5 MB of payload data in high-volume burst exceeding baseline.</p>
+      </div>
+      <button onclick="triggerSpecificAttack('traffic')" class="mt-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-white border border-slate-700 font-semibold transition">
+        Inject Traffic Spike
+      </button>
+    </div>
+
+    <!-- Scenario E: Rogue Device -->
+    <div class="cyber-card p-4 rounded-2xl flex flex-col justify-between">
+      <div>
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-white">Rogue Device Injection</span>
+          <span class="text-xs font-mono font-bold text-cyan-400">+20</span>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-1">Simulates unauthorized hardware (192.168.1.99) joining the LAN with zero baseline.</p>
+      </div>
+      <button onclick="triggerSpecificAttack('rogue')" class="mt-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-white border border-slate-700 font-semibold transition">
+        Inject Rogue Host
+      </button>
+    </div>
+
+    <!-- Scenario F: False Positive Test -->
+    <div class="cyber-card p-4 rounded-2xl flex flex-col justify-between border-emerald-900/60">
+      <div>
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-emerald-400">Benign Update (False Positive Test)</span>
+          <span class="text-xs font-mono font-bold text-emerald-400">NO DROP</span>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-1">Downloads 800 KB OS update from legitimate Microsoft CDN on Laptop 01. Tests false-positive resilience.</p>
+      </div>
+      <button onclick="triggerSpecificAttack('benign')" class="mt-4 py-1.5 rounded-xl bg-slate-800 hover:bg-emerald-950 text-xs text-emerald-300 border border-slate-700 hover:border-emerald-800 font-semibold transition">
+        Inject Benign Spike
+      </button>
+    </div>
+
+  </div>
+
+  <!-- Live Simulation Event Console -->
+  <div class="cyber-card p-5 rounded-2xl border border-slate-800">
+    <div class="flex items-center justify-between mb-3 border-b border-slate-800/80 pb-2">
+      <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center">
+        <i class="fa-solid fa-terminal mr-2 text-cyan-400"></i> Simulation Live Execution Console
+      </h3>
+      <button onclick="clearConsole()" class="text-[11px] text-slate-500 hover:text-slate-300 font-mono">Clear Console</button>
+    </div>
+    <div id="sim-console" class="terminal-box p-3 rounded-xl h-44 overflow-y-auto text-xs font-mono space-y-1">
+      <div class="text-slate-500">> Lab Environment initialized. Ready to execute demonstration steps.</div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/demo_controls.js"></script>
+{% endblock %}

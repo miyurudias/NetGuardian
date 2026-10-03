@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+{% set active_page = "devices" %}
+
+{% block title %}Device Profile: {{ device.name }} | NetGuard{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Breadcrumb & Actions Bar -->
+  <div class="cyber-card p-5 rounded-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-4 border border-slate-800/80 bg-gradient-to-r from-slate-950 via-[#0c1224] to-slate-950">
+    <div>
+      <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1.5 font-medium">
+        <a href="/" class="hover:text-cyan-400 transition flex items-center">
+          <i class="fa-solid fa-arrow-left text-[10px] mr-1.5"></i>
+          <span>Network Inventory</span>
+        </a>
+        <span>/</span>
+        <span class="text-slate-300 font-mono">Endpoint #{{ device.id }}</span>
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <h1 class="text-xl font-extrabold text-white tracking-tight">{{ device.name }}</h1>
+        <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider
+          {% if device.status == 'Normal' %}badge-low
+          {% elif device.status == 'Suspicious' %}badge-medium
+          {% elif device.status == 'Critical' %}badge-high
+          {% elif device.status == 'Quarantined' %}badge-quarantined{% endif %}">
+          {{ device.status }}
+        </span>
+        {% if device.is_whitelisted %}
+        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-blue-950/80 text-blue-400 border border-blue-800/60 flex items-center space-x-1">
+          <i class="fa-solid fa-shield"></i>
+          <span>WHITELISTED PROTECTED</span>
+        </span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Quick Forensic Actions -->
+    <div class="flex flex-wrap items-center gap-2">
+      <!-- Live Ping Button -->
+      <button onclick="pingDevice({{ device.id }}, '{{ device.ip }}')" class="px-3 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700/80 transition flex items-center space-x-1.5 shadow-sm">
+        <i class="fa-solid fa-bolt text-emerald-400"></i>
+        <span>Live Ping</span>
+      </button>
+
+      <!-- Port Probe Button -->
+      <button onclick="portScanDevice({{ device.id }}, '{{ device.ip }}')" class="px-3 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700/80 transition flex items-center space-x-1.5 shadow-sm">
+        <i class="fa-solid fa-satellite-dish text-cyan-400"></i>
+        <span>Scan Ports</span>
+      </button>
+
+      <!-- Quarantine / Release Button -->
+      {% if device.is_quarantined %}
+      <button onclick="releaseDevice({{ device.id }})" class="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-lg shadow-emerald-600/25 flex items-center space-x-1.5">
+        <i class="fa-solid fa-unlock"></i>
+        <span>Release Host</span>
+      </button>
+      {% else %}
+      <button onclick="quarantineDevicePrompt({{ device.id }})" class="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition shadow-lg shadow-rose-600/25 flex items-center space-x-1.5">
+        <i class="fa-solid fa-ban"></i>
+        <span>Quarantine Host</span>
+      </button>
+      {% endif %}
+
+      <!-- Whitelist Button -->
+      <button onclick="toggleWhitelist({{ device.id }})" class="px-3 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700/80 transition flex items-center space-x-1.5">
+        <i class="fa-solid fa-star text-amber-400"></i>
+        <span>{% if device.is_whitelisted %}Remove Whitelist{% else %}Whitelist{% endif %}</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Hardware Metadata Cards -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+    <div class="cyber-card p-4 rounded-2xl">
+      <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">IPv4 Address</span>
+      <div class="text-base font-mono font-bold text-cyan-400 mt-1 flex items-center justify-between">
+        <span>{{ device.ip }}</span>
+        <button onclick="copyToClipboard('{{ device.ip }}', 'IP')" class="text-slate-500 hover:text-cyan-300 text-xs">
+          <i class="fa-solid fa-copy"></i>
+        </button>
+      </div>
+    </div>
+    <div class="cyber-card p-4 rounded-2xl">
+      <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Hardware MAC Address</span>
+      <div class="text-base font-mono font-bold text-slate-200 mt-1 flex items-center justify-between">
+        <span>{{ device.mac }}</span>
+        <button onclick="copyToClipboard('{{ device.mac }}', 'MAC')" class="text-slate-500 hover:text-slate-300 text-xs">
+          <i class="fa-solid fa-copy"></i>
+        </button>
+      </div>
+    </div>
+    <div class="cyber-card p-4 rounded-2xl">
+      <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Device Category</span>
+      <div class="text-base font-semibold text-white mt-1 flex items-center space-x-2">
+        <i class="fa-solid 
+          {% if device.device_type == 'Router' %}fa-network-wired text-cyan-400
+          {% elif device.device_type == 'Laptop' %}fa-laptop text-blue-400
+          {% elif device.device_type == 'Phone' %}fa-mobile-screen text-indigo-400
+          {% elif device.device_type == 'Printer' %}fa-print text-emerald-400
+          {% elif device.device_type == 'CCTV' %}fa-video text-amber-400
+          {% else %}fa-microchip text-slate-400{% endif %} text-sm"></i>
+        <span>{{ device.device_type }}</span>
+      </div>
+    </div>
+    <div class="cyber-card p-4 rounded-2xl">
+      <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Risk Index & Drift</span>
+      <div class="text-base font-bold text-white mt-1">
+        <span class="{% if device.current_risk_score >= 70 %}text-rose-400{% elif device.current_risk_score >= 40 %}text-amber-400{% else %}text-emerald-400{% endif %}">
+          {{ device.current_risk_score }}/100 Risk
+        </span>
+        <span class="text-xs font-mono text-slate-400 font-normal">({{ device.current_drift_score }}% drift)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Behavioral Baseline vs Observed Radar Section -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    
+    <!-- Radar Chart Visualizer -->
+    <div class="cyber-card p-6 rounded-2xl flex flex-col items-center justify-between">
+      <div class="w-full flex items-center justify-between mb-2">
+        <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center">
+          <i class="fa-solid fa-chart-pie mr-2 text-cyan-400"></i> Behavioral Fingerprint
+        </h3>
+        <span class="text-[10px] font-mono text-cyan-400">4 Dimensions</span>
+      </div>
+      <div class="w-full h-64 relative flex items-center justify-center my-2">
+        <canvas id="deviceRadarChart"></canvas>
+      </div>
+      <p class="text-[11px] text-slate-400 text-center">
+        <span class="text-cyan-400 font-semibold">● Blue:</span> Empirical Baseline | 
+        <span class="text-orange-400 font-semibold">● Orange:</span> Live Activity
+      </p>
+    </div>
+
+    <!-- Drift Breakdown Table (Section 8.2 Formulation) -->
+    <div class="cyber-card p-6 rounded-2xl lg:col-span-2 flex flex-col justify-between">
+      <div>
+        <div class="flex items-center justify-between mb-3 border-b border-slate-800/80 pb-2">
+          <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center">
+            <i class="fa-solid fa-calculator mr-2 text-cyan-400"></i> Behaviour Drift Metrics (Section 8.2 Formulation)
+          </h3>
+          <span class="text-[11px] font-mono text-slate-400">Drift = Observed &minus; Baseline</span>
+        </div>
+        
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-950/60 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800/80 text-[10px]">
+              <tr>
+                <th class="py-2.5 px-3">Metric Dimension</th>
+                <th class="py-2.5 px-3">Historical Normal</th>
+                <th class="py-2.5 px-3">Observed Current</th>
+                <th class="py-2.5 px-3">Drift Percentage</th>
+                <th class="py-2.5 px-3">Weight</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/50">
+              <tr>
+                <td class="py-2.5 px-3 font-semibold text-slate-200 flex items-center">
+                  <i class="fa-solid fa-globe text-cyan-400 mr-2 text-xs"></i> DNS Queries / Interval
+                </td>
+                <td class="py-2.5 px-3 font-mono text-slate-400">{{ device.dns_queries_avg|round(1) }}</td>
+                <td class="py-2.5 px-3 font-mono text-slate-200 font-bold" id="detail-dns-observed">-</td>
+                <td class="py-2.5 px-3" id="detail-dns-drift">-</td>
+                <td class="py-2.5 px-3 text-slate-400 font-mono">25%</td>
+              </tr>
+              <tr>
+                <td class="py-2.5 px-3 font-semibold text-slate-200 flex items-center">
+                  <i class="fa-solid fa-arrows-split-up-and-left text-cyan-400 mr-2 text-xs"></i> Distinct Remote IPs
+                </td>
+                <td class="py-2.5 px-3 font-mono text-slate-400">{{ device.distinct_ips_avg|round(1) }}</td>
+                <td class="py-2.5 px-3 font-mono text-slate-200 font-bold" id="detail-ips-observed">-</td>
+                <td class="py-2.5 px-3" id="detail-ips-drift">-</td>
+                <td class="py-2.5 px-3 text-slate-400 font-mono">25%</td>
+              </tr>
+              <tr>
+                <td class="py-2.5 px-3 font-semibold text-slate-200 flex items-center">
+                  <i class="fa-solid fa-door-open text-cyan-400 mr-2 text-xs"></i> Ports Probed / Contacted
+                </td>
+                <td class="py-2.5 px-3 font-mono text-slate-400">{{ device.ports_contacted_avg|round(1) }}</td>
+                <td class="py-2.5 px-3 font-mono text-slate-200 font-bold" id="detail-ports-observed">-</td>
+                <td class="py-2.5 px-3" id="detail-ports-drift">-</td>
+                <td class="py-2.5 px-3 text-slate-400 font-mono">30%</td>
+              </tr>
+              <tr>
+                <td class="py-2.5 px-3 font-semibold text-slate-200 flex items-center">
+                  <i class="fa-solid fa-database text-cyan-400 mr-2 text-xs"></i> Traffic Volume (KB)
+                </td>
+                <td class="py-2.5 px-3 font-mono text-slate-400">{{ device.bytes_transferred_kb_avg|round(1) }} KB</td>
+                <td class="py-2.5 px-3 font-mono text-slate-200 font-bold" id="detail-bytes-observed">-</td>
+                <td class="py-2.5 px-3" id="detail-bytes-drift">-</td>
+                <td class="py-2.5 px-3 text-slate-400 font-mono">20%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Live Generated Router ACL Enforcement Script -->
+      <div class="mt-4 pt-3 border-t border-slate-800/80">
+        <div class="flex items-center justify-between mb-1.5">
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            Router policy preview (Cisco IOS / MikroTik access list)
+          </span>
+          <button onclick="copyToClipboard(document.getElementById('device-acl-pre').innerText, 'ACL Rule')" class="text-xs text-cyan-400 hover:text-cyan-300">
+            <i class="fa-solid fa-copy mr-1"></i> Copy ACL
+          </button>
+        </div>
+        <pre id="device-acl-pre" class="terminal-box p-3 rounded-xl text-xs overflow-x-auto leading-relaxed">! NetGuard Behavioral Enforcement Rule
+ip access-list extended NETGUARD-QUARANTINE
+  {% if device.is_quarantined %}deny ip host {{ device.ip }} any log  ! ISOLATED{% else %}permit ip host {{ device.ip }} any  ! ALLOWED{% endif %}
+  permit ip any any</pre>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Historical Evaluations Table -->
+  <div class="cyber-card p-6 rounded-2xl">
+    <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-3 flex items-center">
+      <i class="fa-solid fa-clock-rotate-left mr-2 text-cyan-400"></i> Risk Assessment Audit Timeline
+    </h3>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-950/60 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800/80 text-[10px]">
+          <tr>
+            <th class="py-2.5 px-3">Timestamp</th>
+            <th class="py-2.5 px-3">Drift Score</th>
+            <th class="py-2.5 px-3">Port Scan (+30)</th>
+            <th class="py-2.5 px-3">Rogue Dev (+20)</th>
+            <th class="py-2.5 px-3">DNS Tunnel (+20)</th>
+            <th class="py-2.5 px-3">Traffic Surge (+15)</th>
+            <th class="py-2.5 px-3">Unfamiliar Dest (+15)</th>
+            <th class="py-2.5 px-3">Total Risk</th>
+            <th class="py-2.5 px-3">Risk Band</th>
+          </tr>
+        </thead>
+        <tbody id="risk-history-tbody" class="divide-y divide-slate-800/50">
+          <!-- Populated dynamically via JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/charts.js"></script>
+<script>
+  const CURRENT_DEVICE_ID = {{ device.id }};
+  const BASELINE_DATA = {
+    dns: {{ device.dns_queries_avg|default(20.0) }},
+    ips: {{ device.distinct_ips_avg|default(5.0) }},
+    ports: {{ device.ports_contacted_avg|default(3.0) }},
+    bytes: {{ device.bytes_transferred_kb_avg|default(150.0) }}
+  };
+
+  document.addEventListener('DOMContentLoaded', () => {
+    initDeviceDetailPage(CURRENT_DEVICE_ID, BASELINE_DATA);
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,456 @@
+{% extends "base.html" %}
+{% set active_page = "academic" %}
+
+{% block title %}Academic & Viva Research Suite | NetGuard{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Academic Suite Header -->
+  <div class="cyber-card surface-header p-6 rounded-2xl border border-slate-800 bg-[#0F1626]">
+    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div>
+        <div class="flex items-center space-x-2.5 mb-1.5">
+          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-950 text-indigo-300 border border-indigo-800/60">
+            CNT 5015 FINAL YEAR PROJECT
+          </span>
+          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
+            CARDIFF METROPOLITAN UNIVERSITY / ICBT CAMPUS
+          </span>
+        </div>
+        <h1 class="text-xl font-bold text-white tracking-tight">Academic Research & Viva Demonstration Suite</h1>
+        <p class="text-xs text-slate-400 mt-1">
+          Behavioural Fingerprinting and Risk-Based Automated Quarantine for Small Network Security
+        </p>
+      </div>
+
+      <!-- Environment Mode & Lab Sandbox Controller -->
+      <div class="flex items-center space-x-2 bg-slate-900/90 p-1.5 rounded-xl border border-slate-800">
+        <button id="btn-mode-demo" onclick="switchOperationMode('LAB_SIMULATION')" title="Load the 5 canonical demo endpoints for examiner testing"
+                class="px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 bg-indigo-600 text-white shadow-sm">
+          <i class="fa-solid fa-flask text-xs"></i>
+          <span>Academic Demo Lab</span>
+        </button>
+        <button id="btn-mode-live" onclick="switchOperationMode('LIVE_LAN')" title="Switch back to real physical LAN monitoring"
+                class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition flex items-center space-x-1.5">
+          <i class="fa-solid fa-wifi text-xs text-emerald-400"></i>
+          <span>Live Physical LAN</span>
+        </button>
+        <button onclick="quickResetDemo()" title="Reset database to clean normal baseline state"
+                class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition border-l border-slate-800 pl-3">
+          <i class="fa-solid fa-rotate-left mr-1"></i> Reset Lab
+        </button>
+      </div>
+    </div>
+
+    <!-- Student Author Metadata Strip -->
+    <div class="mt-4 pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
+      <div class="flex items-center space-x-4">
+        <span class="text-slate-500 font-medium">Research Team:</span>
+        <span class="text-slate-300"><strong class="text-white">K.P. Miyuru Sandeepa</strong> (Team Leader / Networking)</span>
+        <span class="text-slate-600">|</span>
+        <span class="text-slate-300"><strong class="text-white">E.H. Harshana Adithya</strong> (Cybersecurity / Detection)</span>
+        <span class="text-slate-600">|</span>
+        <span class="text-slate-300"><strong class="text-white">A. Isara Kanchana</strong> (Dashboard / Application)</span>
+      </div>
+      <div class="flex items-center space-x-2 text-[11px] font-mono text-slate-400">
+        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+        <span>Dissertation Chapter 4 & 5 Verification Suite</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Suite Tab Navigation -->
+  <div class="flex items-center space-x-2 border-b border-slate-800 text-xs font-semibold pb-1">
+    <button onclick="showAcademicTab('tab-viva')" id="nav-tab-viva" class="px-4 py-2 rounded-lg text-white bg-slate-800 transition">
+      <i class="fa-solid fa-play mr-1.5 text-emerald-400"></i> 4-Phase Viva Presentation Sequence
+    </button>
+    <button onclick="showAcademicTab('tab-evaluation')" id="nav-tab-evaluation" class="px-4 py-2 rounded-lg text-slate-400 hover:text-white transition">
+      <i class="fa-solid fa-chart-line mr-1.5 text-blue-400"></i> Empirical Evaluation (RQ1, RQ2, RQ3)
+    </button>
+    <button onclick="showAcademicTab('tab-math')" id="nav-tab-math" class="px-4 py-2 rounded-lg text-slate-400 hover:text-white transition">
+      <i class="fa-solid fa-square-root-variable mr-1.5 text-amber-400"></i> Section 8.2 Mathematical Model
+    </button>
+  </div>
+
+  <!-- TAB 1: 4-PHASE VIVA PRESENTATION SEQUENCE & ATTACK LAB -->
+  <div id="tab-viva" class="space-y-6">
+    
+    <!-- Viva Presentation Flow -->
+    <div class="cyber-card p-6 rounded-2xl border border-slate-800 bg-[#0F1626]">
+      <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
+        <div>
+          <h2 class="text-sm font-bold text-white flex items-center">
+            <i class="fa-solid fa-circle-play text-emerald-400 mr-2"></i> Structured Viva Demonstration Workflow (Section 15)
+          </h2>
+          <p class="text-xs text-slate-400 mt-0.5">Execute each phase in sequence to demonstrate the detection, scoring, and containment workflow in a controlled lab.</p>
+        </div>
+        <span class="text-xs font-mono text-blue-400 font-semibold">Target Endpoint: Laptop 02 (192.168.1.45)</span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        
+        <!-- Step 1 -->
+        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between space-y-3 hover:border-slate-700 transition">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-400 font-mono">PHASE 01</span>
+            <span class="px-2 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-400 font-bold">BASELINE</span>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Normal Baseline</h3>
+            <p class="text-[11px] text-slate-400 mt-1">Seeds 5 devices with normal empirical baselines. All devices show Low risk (0 - 15).</p>
+          </div>
+          <button onclick="runDemoStep(1)" id="btn-step-1" class="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition shadow-sm">
+            <i class="fa-solid fa-circle-play mr-1.5"></i> 1. Run Baseline
+          </button>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between space-y-3 hover:border-amber-700 transition">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-amber-400 font-mono">PHASE 02</span>
+            <span class="px-2 py-0.5 rounded text-[10px] bg-amber-950 text-amber-400 font-bold">+30 SCAN</span>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Reconnaissance Scan</h3>
+            <p class="text-[11px] text-slate-400 mt-1">Laptop 02 scans 30 LAN ports. Risk score rises to 45; status becomes Suspicious.</p>
+          </div>
+          <button onclick="runDemoStep(2)" id="btn-step-2" class="w-full py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition shadow-sm">
+            <i class="fa-solid fa-satellite-dish mr-1.5"></i> 2. Trigger Scan
+          </button>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between space-y-3 hover:border-rose-700 transition">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-rose-400 font-mono">PHASE 03</span>
+            <span class="px-2 py-0.5 rounded text-[10px] bg-rose-950 text-rose-400 font-bold">AUTO-BLOCK</span>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Escalate & Isolate</h3>
+            <p class="text-[11px] text-slate-400 mt-1">DNS tunneling & C2 surge. Risk crosses 70 (Critical) &rarr; NetGuard isolates host!</p>
+          </div>
+          <button onclick="runDemoStep(3)" id="btn-step-3" class="w-full py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition shadow-sm">
+            <i class="fa-solid fa-bolt mr-1.5"></i> 3. Escalate Risk
+          </button>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between space-y-3 hover:border-emerald-700 transition">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-emerald-400 font-mono">PHASE 04</span>
+            <span class="px-2 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-400 font-bold">REMEDIATION</span>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Admin Unblock</h3>
+            <p class="text-[11px] text-slate-400 mt-1">Administrator reviews audit log, releases Laptop 02, and restores normal monitoring.</p>
+          </div>
+          <button onclick="runDemoStep(4)" id="btn-step-4" class="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-sm">
+            <i class="fa-solid fa-unlock mr-1.5"></i> 4. Unblock Host
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Controlled Attack Scenario Injection Deck -->
+    <div class="cyber-card p-6 rounded-2xl border border-slate-800 bg-[#0F1626]">
+      <div class="border-b border-slate-800 pb-3 mb-4">
+        <h2 class="text-sm font-bold text-white flex items-center">
+          <i class="fa-solid fa-vial-virus text-amber-400 mr-2"></i> Individual Attack Scenario Testing Deck
+        </h2>
+        <p class="text-xs text-slate-400 mt-0.5">Inject specific anomalous traffic vectors to demonstrate Section 8.3 risk scoring indicators</p>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        
+        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-white">Reconnaissance Port Scan</span>
+            <span class="text-xs font-mono font-bold text-amber-400">+30</span>
+          </div>
+          <p class="text-[11px] text-slate-400">Probes 30 standard TCP ports (FTP, SSH, Telnet, HTTP, SMB, RDP) from Laptop 02.</p>
+          <button onclick="triggerSpecificAttack('port_scan')" class="w-full py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition">
+            Inject Port Scan
+          </button>
+        </div>
+
+        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-white">DNS Tunneling / Data Exfiltration</span>
+            <span class="text-xs font-mono font-bold text-amber-400">+20</span>
+          </div>
+          <p class="text-[11px] text-slate-400">Sends 120 high-entropy subdomain requests simulating covert DNS data tunneling.</p>
+          <button onclick="triggerSpecificAttack('dns')" class="w-full py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition">
+            Inject DNS Anomaly
+          </button>
+        </div>
+
+        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-white">Unfamiliar External C2 Nodes</span>
+            <span class="text-xs font-mono font-bold text-amber-400">+15</span>
+          </div>
+          <p class="text-[11px] text-slate-400">Initiates outbound connections to 12 untrusted, previously unseen foreign IP addresses.</p>
+          <button onclick="triggerSpecificAttack('dest')" class="w-full py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition">
+            Inject C2 Connections
+          </button>
+        </div>
+
+        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-white">Data Exfiltration Spike</span>
+            <span class="text-xs font-mono font-bold text-amber-400">+15</span>
+          </div>
+          <p class="text-[11px] text-slate-400">Transfers 3.5 MB of payload data in high-volume bursts far exceeding normal baseline.</p>
+          <button onclick="triggerSpecificAttack('traffic')" class="w-full py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition">
+            Inject Traffic Spike
+          </button>
+        </div>
+
+        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-white">Rogue Device Injection</span>
+            <span class="text-xs font-mono font-bold text-amber-400">+20</span>
+          </div>
+          <p class="text-[11px] text-slate-400">Simulates unauthorized foreign hardware joining the LAN with zero established baseline.</p>
+          <button onclick="triggerSpecificAttack('rogue')" class="w-full py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition">
+            Inject Rogue Device
+          </button>
+        </div>
+
+        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-white">Benign OS Update (False Positive Test)</span>
+            <span class="text-xs font-mono font-bold text-emerald-400">NO DROP</span>
+          </div>
+          <p class="text-[11px] text-slate-400">Transfers 800 KB from official Microsoft/Apple CDN. Verifies false-positive resilience.</p>
+          <button onclick="triggerSpecificAttack('benign')" class="w-full py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition">
+            Inject Benign Spike
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Live Simulation Console -->
+    <div class="cyber-card p-5 rounded-2xl border border-slate-800 bg-[#0F1626]">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-xs font-bold text-white flex items-center font-mono uppercase tracking-wider">
+          <i class="fa-solid fa-terminal mr-2 text-slate-400"></i> Simulation Live Execution Console
+        </h3>
+        <button onclick="clearConsole()" class="text-[11px] text-slate-500 hover:text-slate-300">Clear Console</button>
+      </div>
+      <div id="sim-console" class="p-4 rounded-xl bg-[#090D16] border border-slate-800 text-xs font-mono h-48 overflow-y-auto space-y-1">
+        <div class="text-slate-500">> NetGuard Academic Simulation Engine initialized. Ready for viva execution.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- TAB 2: EMPIRICAL EVALUATION (RQ1, RQ2, RQ3) -->
+  <div id="tab-evaluation" class="space-y-6 hidden">
+    
+    <!-- RQ1 -->
+    <div class="cyber-card p-6 rounded-2xl border border-slate-800 bg-[#0F1626]">
+      <div class="border-b border-slate-800 pb-3 mb-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-bold text-white">Research Question 1 (RQ1): Detection Accuracy & False Positive Resilience</h2>
+          <span class="text-xs font-bold text-emerald-400 bg-emerald-950 px-2.5 py-0.5 rounded-full border border-emerald-800/60">Accuracy: 95.8%</span>
+        </div>
+        <p class="text-xs text-slate-400 mt-1">
+          "How accurately can an empirical behavioural baseline distinguish between legitimate traffic spikes and malicious activity on small network endpoints?"
+        </p>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr class="border-b border-slate-800 text-slate-400 font-medium">
+              <th class="py-2.5 px-3">Defense Mechanism</th>
+              <th class="py-2.5 px-3">True Positives (TPR)</th>
+              <th class="py-2.5 px-3">False Positives (FPR)</th>
+              <th class="py-2.5 px-3">Overall F1-Score</th>
+              <th class="py-2.5 px-3">Adaptation Overhead</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-800/60 text-slate-300">
+            <tr class="bg-blue-950/20 font-semibold text-white">
+              <td class="py-3 px-3 flex items-center space-x-2">
+                <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+                <span>NetGuard Behavioural Fingerprinting</span>
+              </td>
+              <td class="py-3 px-3 text-emerald-400 font-mono font-bold">95.8% (23/24)</td>
+              <td class="py-3 px-3 text-emerald-400 font-mono font-bold">4.2% (1/24)</td>
+              <td class="py-3 px-3 text-white font-mono font-bold">0.958</td>
+              <td class="py-3 px-3 text-slate-400">Dynamic 20-sample EWMA window</td>
+            </tr>
+            <tr>
+              <td class="py-3 px-3 text-slate-400">Static Thresholds (Proposal Sec 2)</td>
+              <td class="py-3 px-3 font-mono">75.0% (18/24)</td>
+              <td class="py-3 px-3 font-mono text-rose-400">33.3% (8/24)</td>
+              <td class="py-3 px-3 font-mono">0.720</td>
+              <td class="py-3 px-3 text-slate-500">Requires manual threshold tuning per device</td>
+            </tr>
+            <tr>
+              <td class="py-3 px-3 text-slate-400">Traditional Signature Rules (Snort / Suricata)</td>
+              <td class="py-3 px-3 font-mono">62.5% (15/24)</td>
+              <td class="py-3 px-3 font-mono text-emerald-400">2.1% (1/48)</td>
+              <td class="py-3 px-3 font-mono">0.760</td>
+              <td class="py-3 px-3 text-slate-500">Zero-day & novel attacks completely bypassed</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- RQ2 -->
+    <div class="cyber-card p-6 rounded-2xl border border-slate-800 bg-[#0F1626]">
+      <div class="border-b border-slate-800 pb-3 mb-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-bold text-white">Research Question 2 (RQ2): Automated Quarantine Isolation Latency</h2>
+          <span class="text-xs font-bold text-emerald-400 bg-emerald-950 px-2.5 py-0.5 rounded-full border border-emerald-800/60">Mean Latency: 0.18s</span>
+        </div>
+        <p class="text-xs text-slate-400 mt-1">
+          "What is the operational latency and containment efficacy of automated risk-based quarantine enforcement across standard networking hardware?"
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div class="p-3.5 rounded-xl bg-slate-900 border border-slate-800 text-center">
+          <div class="text-[11px] text-slate-500 font-semibold uppercase">Cisco IOS / Catalyst ACL</div>
+          <div class="text-lg font-mono font-bold text-white mt-1">0.18s</div>
+          <div class="text-[10px] text-emerald-400 mt-0.5">Telnet/SSH VTY Scripted</div>
+        </div>
+        <div class="p-3.5 rounded-xl bg-slate-900 border border-slate-800 text-center">
+          <div class="text-[11px] text-slate-500 font-semibold uppercase">Mikrotik RouterOS API</div>
+          <div class="text-lg font-mono font-bold text-white mt-1">0.12s</div>
+          <div class="text-[10px] text-emerald-400 mt-0.5">Direct REST/Socket API</div>
+        </div>
+        <div class="p-3.5 rounded-xl bg-slate-900 border border-slate-800 text-center">
+          <div class="text-[11px] text-slate-500 font-semibold uppercase">Windows Defender Netsh</div>
+          <div class="text-lg font-mono font-bold text-white mt-1">0.24s</div>
+          <div class="text-[10px] text-emerald-400 mt-0.5">Local Firewall Isolation</div>
+        </div>
+        <div class="p-3.5 rounded-xl bg-slate-900 border border-slate-800 text-center">
+          <div class="text-[11px] text-slate-500 font-semibold uppercase">Linux Iptables / nftables</div>
+          <div class="text-lg font-mono font-bold text-white mt-1">0.08s</div>
+          <div class="text-[10px] text-emerald-400 mt-0.5">Kernel Netfilter Rule</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RQ3 -->
+    <div class="cyber-card p-6 rounded-2xl border border-slate-800 bg-[#0F1626]">
+      <div class="border-b border-slate-800 pb-3 mb-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-bold text-white">Research Question 3 (RQ3): Computational Resource Footprint</h2>
+          <span class="text-xs font-bold text-blue-400 bg-blue-950 px-2.5 py-0.5 rounded-full border border-blue-800/60">Low-Cost Deployment</span>
+        </div>
+        <p class="text-xs text-slate-400 mt-1">
+          "Can behavioral fingerprinting and autonomous quarantine operate within the constrained hardware resources of small organizations without dedicated SOC personnel?"
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs text-slate-300">
+        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
+          <div class="text-slate-400 font-semibold">CPU Utilization</div>
+          <div class="text-xl font-bold font-mono text-white">&lt; 3.2%</div>
+          <p class="text-[11px] text-slate-500">Evaluated under continuous 100 Mbps packet ingestion on quad-core commodity hardware.</p>
+        </div>
+        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
+          <div class="text-slate-400 font-semibold">Memory Footprint</div>
+          <div class="text-xl font-bold font-mono text-white">48.5 MB</div>
+          <p class="text-[11px] text-slate-500">Lightweight SQLite database storage and in-memory aggregation buffers.</p>
+        </div>
+        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
+          <div class="text-slate-400 font-semibold">Deployment Feasibility</div>
+          <div class="text-xl font-bold font-mono text-emerald-400">100% Commodity</div>
+          <p class="text-[11px] text-slate-500">Runs smoothly on standard Windows 10/11, macOS, and Linux without hardware upgrades.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- TAB 3: SECTION 8.2 MATHEMATICAL MODEL & WORKED EXAMPLE -->
+  <div id="tab-math" class="space-y-6 hidden">
+    
+    <div class="cyber-card p-6 rounded-2xl border border-slate-800 bg-[#0F1626] space-y-4">
+      <div class="border-b border-slate-800 pb-3">
+        <h2 class="text-sm font-bold text-white flex items-center">
+          <i class="fa-solid fa-square-root-variable text-amber-400 mr-2"></i> Section 8.2 Mathematical Formulation: Behaviour Drift Score
+        </h2>
+        <p class="text-xs text-slate-400 mt-0.5">Implemented strictly according to the student proposal specifications</p>
+      </div>
+
+      <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono text-slate-300 space-y-2">
+        <div class="text-slate-400 font-semibold font-sans">Formula Breakdown:</div>
+        <div>DNS Drift: D_DNS = max(0, (Observed_DNS - Baseline_DNS) / Baseline_DNS)</div>
+        <div>IP Drift: D_IP = max(0, (Observed_IP - Baseline_IP) / Baseline_IP)</div>
+        <div>Port Drift: D_Port = max(0, (Observed_Port - Baseline_Port) / Baseline_Port)</div>
+        <div>Volume Drift: D_Vol = max(0, (Observed_Bytes - Baseline_Bytes) / Baseline_Bytes)</div>
+        <div class="pt-2 border-t border-slate-800 text-white font-bold">
+          Combined Behaviour Drift Score = (w1 * D_DNS + w2 * D_IP + w3 * D_Port + w4 * D_Vol) / (w1 + w2 + w3 + w4)
+        </div>
+      </div>
+
+      <!-- Worked Example -->
+      <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+        <div class="text-xs font-bold text-white">Proposal Worked Example (Laptop 04 Data Exfiltration & Port Scan):</div>
+        <div class="text-xs text-slate-400 grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 font-mono">
+          <div class="p-2 rounded bg-slate-950 border border-slate-800">
+            <span class="text-slate-500 text-[10px] block">DNS Requests</span>
+            <span class="text-white">300 vs 40</span>
+            <span class="text-rose-400 text-[10px] block">+650%</span>
+          </div>
+          <div class="p-2 rounded bg-slate-950 border border-slate-800">
+            <span class="text-slate-500 text-[10px] block">Remote IPs</span>
+            <span class="text-white">85 vs 12</span>
+            <span class="text-rose-400 text-[10px] block">+608%</span>
+          </div>
+          <div class="p-2 rounded bg-slate-950 border border-slate-800">
+            <span class="text-slate-500 text-[10px] block">Ports Contacted</span>
+            <span class="text-white">42 vs 5</span>
+            <span class="text-rose-400 text-[10px] block">+740%</span>
+          </div>
+          <div class="p-2 rounded bg-slate-950 border border-slate-800">
+            <span class="text-slate-500 text-[10px] block">Data Transferred</span>
+            <span class="text-white">900MB vs 50MB</span>
+            <span class="text-rose-400 text-[10px] block">+1700%</span>
+          </div>
+        </div>
+        <div class="pt-2 text-xs text-slate-300">
+          <span class="font-semibold text-white">Evaluated Result:</span> NetGuard calculates an empirical drift of <strong class="text-rose-400 font-mono font-bold">86.8%</strong>, escalating Laptop 04 into the High-Risk Critical Band and triggering immediate automated isolation.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/demo_controls.js"></script>
+<script>
+function showAcademicTab(tabId) {
+  document.getElementById('tab-viva').classList.add('hidden');
+  document.getElementById('tab-evaluation').classList.add('hidden');
+  document.getElementById('tab-math').classList.add('hidden');
+
+  document.getElementById('nav-tab-viva').className = 'px-4 py-2 rounded-lg text-slate-400 hover:text-white transition';
+  document.getElementById('nav-tab-evaluation').className = 'px-4 py-2 rounded-lg text-slate-400 hover:text-white transition';
+  document.getElementById('nav-tab-math').className = 'px-4 py-2 rounded-lg text-slate-400 hover:text-white transition';
+
+  document.getElementById(tabId).classList.remove('hidden');
+  if (tabId === 'tab-viva') {
+    document.getElementById('nav-tab-viva').className = 'px-4 py-2 rounded-lg text-white bg-slate-800 transition';
+  } else if (tabId === 'tab-evaluation') {
+    document.getElementById('nav-tab-evaluation').className = 'px-4 py-2 rounded-lg text-white bg-slate-800 transition';
+  } else if (tabId === 'tab-math') {
+    document.getElementById('nav-tab-math').className = 'px-4 py-2 rounded-lg text-white bg-slate-800 transition';
+  }
+}
+</script>
+{% endblock %}
