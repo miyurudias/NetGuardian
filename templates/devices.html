@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% set active_page = "devices" %}
+
+{% block title %}Network Endpoints Inventory | NetGuard{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header -->
+  <div class="cyber-card surface-header p-6 rounded-2xl border border-slate-800 bg-[#0F1626] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+      <div class="flex items-center space-x-2.5">
+        <h1 class="text-xl font-bold text-white tracking-tight">Monitored Network Endpoints</h1>
+        <span id="devices-total-badge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700">Loading...</span>
+      </div>
+      <p class="text-xs text-slate-400 mt-1">Real-time inventory of physical and virtual hardware connected to the local network segment.</p>
+    </div>
+
+    <!-- Action Tools -->
+    <div class="flex items-center space-x-2.5">
+      <button onclick="openNetworkScanModal()" class="px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition flex items-center space-x-1.5 shadow-sm">
+        <i class="fa-solid fa-satellite-dish text-xs"></i>
+        <span>Scan</span>
+      </button>
+      <button onclick="fetchDevices()" class="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition flex items-center space-x-1.5">
+        <i class="fa-solid fa-rotate text-xs"></i>
+        <span>Refresh</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Filter & Search Toolbar -->
+  <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
+    <div class="relative w-full sm:w-80">
+      <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+      <input type="text" id="device-search-input" oninput="filterDeviceTable()"
+             placeholder="Search by IP, MAC, Name, or Vendor..."
+             class="w-full pl-9 pr-3.5 py-2 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition">
+    </div>
+
+    <div class="flex items-center space-x-2 w-full sm:w-auto">
+      <select id="device-category-filter" onchange="filterDeviceTable()"
+              class="px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 focus:outline-none focus:border-blue-500">
+        <option value="">All Hardware Categories</option>
+        <option value="Router">Routers & Gateways</option>
+        <option value="Laptop">Laptops & PCs</option>
+        <option value="Phone">Smartphones & Tablets</option>
+        <option value="Printer">Network Printers</option>
+        <option value="CCTV">CCTV & Cameras</option>
+        <option value="Smart TV">Smart TVs & Media</option>
+        <option value="Server">Servers & Infrastructure</option>
+      </select>
+
+      <select id="device-status-filter" onchange="filterDeviceTable()"
+              class="px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 focus:outline-none focus:border-blue-500">
+        <option value="">All Security Statuses</option>
+        <option value="Normal">Normal (Low Risk)</option>
+        <option value="Suspicious">Suspicious (Medium Risk)</option>
+        <option value="Critical">Critical (High Risk)</option>
+        <option value="Quarantined">Quarantined</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Endpoints Table Card -->
+  <div class="cyber-card rounded-2xl border border-slate-800 bg-[#0F1626] overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs border-collapse">
+        <thead>
+          <tr class="border-b border-slate-800 bg-slate-900/60 text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+            <th class="py-3 px-4">Hardware & Vendor</th>
+            <th class="py-3 px-4">IP & MAC Address</th>
+            <th class="py-3 px-4">Category</th>
+            <th class="py-3 px-4">Live Latency</th>
+            <th class="py-3 px-4">Behavior Drift</th>
+            <th class="py-3 px-4">Risk Score</th>
+            <th class="py-3 px-4">Status</th>
+            <th class="py-3 px-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="devices-table-body" class="divide-y divide-slate-800/60 text-slate-300">
+          <tr>
+            <td colspan="8" class="text-center py-10 text-slate-500">
+              <i class="fa-solid fa-spinner fa-spin text-blue-500 text-lg mb-2"></i>
+              <p>Loading active network inventory...</p>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  fetchDevices();
+});
+</script>
+{% endblock %}

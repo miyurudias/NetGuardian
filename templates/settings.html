@@ -1,0 +1,358 @@
+{% extends "base.html" %}
+{% set active_page = "settings" %}
+
+{% block title %}System Settings & Parameter Tuning | NetGuard{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+
+  <!-- Header Banner -->
+  <div class="cyber-card surface-header p-6 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-slate-800 bg-[#0F1626]">
+    <div class="flex items-center space-x-3.5">
+      <div class="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-blue-400">
+        <i class="fa-solid fa-sliders text-base"></i>
+      </div>
+      <div>
+        <div class="flex items-center space-x-2">
+          <h1 class="text-lg font-bold text-white tracking-tight">System Configuration & Parameter Tuning</h1>
+          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-950 text-blue-300 border border-blue-800/60">
+            PROPOSAL SEC 8.3
+          </span>
+        </div>
+        <p class="text-xs text-slate-400 mt-0.5">Customize risk scoring model weights, anomaly thresholds, and quarantine enforcement modes</p>
+      </div>
+    </div>
+
+    <!-- Reset to Defaults Button -->
+    <button type="button" onclick="resetDefaults()" class="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition flex items-center space-x-1.5">
+      <i class="fa-solid fa-arrow-rotate-left text-slate-400"></i>
+      <span>Reset Defaults</span>
+    </button>
+  </div>
+
+  <form id="settings-form" onsubmit="saveSettings(event)" class="space-y-6">
+
+    <!-- Risk Weights Card (Proposal Section 8.3) -->
+    <div class="cyber-card p-6 rounded-2xl border border-slate-800 bg-[#0F1626] space-y-5">
+      <div class="border-b border-slate-800 pb-3 flex items-center justify-between">
+        <div>
+          <h2 class="text-sm font-bold text-white tracking-wide">Risk Indicator Weights (Cumulative Max: 100)</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Determines point contribution for each detected anomaly signature in the risk equation</p>
+        </div>
+        <div id="total-weights-display" class="px-3 py-1 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono font-bold text-emerald-400">
+          Total: 100 / 100
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs">
+        
+        <!-- Port Scan Weight -->
+        <div class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-semibold text-white flex items-center">
+              <i class="fa-solid fa-satellite-dish text-blue-400 mr-2"></i> Port Scanning Detected
+            </span>
+            <span id="badge_port_scan" class="px-2 py-0.5 rounded font-mono font-bold bg-blue-950 text-blue-300 text-[11px] border border-blue-800/50">+30 pts</span>
+          </div>
+          <p class="text-[11px] text-slate-500">Triggered when distinct probed destination ports spike above threshold</p>
+          <input type="range" id="weight_port_scan" min="0" max="50" value="30" oninput="handleWeightChange('port_scan')" class="cyber-slider mt-2">
+          <div class="flex items-center justify-between text-[10px] font-mono text-slate-500 pt-0.5">
+            <span>0 pts</span>
+            <span>25 pts</span>
+            <span>50 pts</span>
+          </div>
+        </div>
+
+        <!-- Rogue Device Weight -->
+        <div class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-semibold text-white flex items-center">
+              <i class="fa-solid fa-user-secret text-rose-400 mr-2"></i> Unknown / Rogue Device
+            </span>
+            <span id="badge_unknown_device" class="px-2 py-0.5 rounded font-mono font-bold bg-rose-950 text-rose-300 text-[11px] border border-rose-800/50">+20 pts</span>
+          </div>
+          <p class="text-[11px] text-slate-500">New MAC address not found in baseline inventory or approved whitelist</p>
+          <input type="range" id="weight_unknown_device" min="0" max="50" value="20" oninput="handleWeightChange('unknown_device')" class="cyber-slider mt-2">
+          <div class="flex items-center justify-between text-[10px] font-mono text-slate-500 pt-0.5">
+            <span>0 pts</span>
+            <span>25 pts</span>
+            <span>50 pts</span>
+          </div>
+        </div>
+
+        <!-- DNS Anomaly Weight -->
+        <div class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-semibold text-white flex items-center">
+              <i class="fa-solid fa-globe text-cyan-400 mr-2"></i> DNS Anomaly / Tunneling
+            </span>
+            <span id="badge_dns_anomaly" class="px-2 py-0.5 rounded font-mono font-bold bg-cyan-950 text-cyan-300 text-[11px] border border-cyan-800/50">+20 pts</span>
+          </div>
+          <p class="text-[11px] text-slate-500">Unusually high query rate or DNS tunneling signatures</p>
+          <input type="range" id="weight_dns_anomaly" min="0" max="50" value="20" oninput="handleWeightChange('dns_anomaly')" class="cyber-slider mt-2">
+          <div class="flex items-center justify-between text-[10px] font-mono text-slate-500 pt-0.5">
+            <span>0 pts</span>
+            <span>25 pts</span>
+            <span>50 pts</span>
+          </div>
+        </div>
+
+        <!-- Traffic Volume Spike Weight -->
+        <div class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-semibold text-white flex items-center">
+              <i class="fa-solid fa-arrow-trend-up text-amber-400 mr-2"></i> Traffic-Volume Spike
+            </span>
+            <span id="badge_traffic_spike" class="px-2 py-0.5 rounded font-mono font-bold bg-amber-950 text-amber-300 text-[11px] border border-amber-800/50">+15 pts</span>
+          </div>
+          <p class="text-[11px] text-slate-500">Sudden data surge exceeding standard EWMA flow threshold</p>
+          <input type="range" id="weight_traffic_spike" min="0" max="50" value="15" oninput="handleWeightChange('traffic_spike')" class="cyber-slider mt-2">
+          <div class="flex items-center justify-between text-[10px] font-mono text-slate-500 pt-0.5">
+            <span>0 pts</span>
+            <span>25 pts</span>
+            <span>50 pts</span>
+          </div>
+        </div>
+
+        <!-- Unfamiliar Destination Weight -->
+        <div class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-2 md:col-span-2">
+          <div class="flex items-center justify-between">
+            <span class="font-semibold text-white flex items-center">
+              <i class="fa-solid fa-arrows-split-up-and-left text-purple-400 mr-2"></i> Unfamiliar Remote Destination
+            </span>
+            <span id="badge_unfamiliar_dest" class="px-2 py-0.5 rounded font-mono font-bold bg-purple-950 text-purple-300 text-[11px] border border-purple-800/50">+15 pts</span>
+          </div>
+          <p class="text-[11px] text-slate-500">Connection attempts to previously unseen external IP addresses</p>
+          <input type="range" id="weight_unfamiliar_dest" min="0" max="50" value="15" oninput="handleWeightChange('unfamiliar_dest')" class="cyber-slider mt-2">
+          <div class="flex items-center justify-between text-[10px] font-mono text-slate-500 pt-0.5">
+            <span>0 pts</span>
+            <span>25 pts</span>
+            <span>50 pts</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Thresholds & Automation Card -->
+    <div class="cyber-card p-6 rounded-2xl border border-slate-800 bg-[#0F1626] space-y-5">
+      <div class="border-b border-slate-800 pb-3">
+        <h2 class="text-sm font-bold text-white tracking-wide">Thresholds & Enforcement Subsystems</h2>
+        <p class="text-xs text-slate-400 mt-0.5">Configure quarantine trigger boundaries and infrastructure isolation target</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs">
+        
+        <!-- Quarantine Threshold Slider -->
+        <div class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="font-semibold text-white">Critical Quarantine Threshold (T2)</label>
+            <span id="badge_quarantine_thresh" class="px-2 py-0.5 rounded font-mono font-bold bg-rose-950 text-rose-300 text-[11px] border border-rose-800/50">&ge; 70 Risk</span>
+          </div>
+          <p class="text-[11px] text-slate-500">Host risk scores at or above this value enter the configured isolation workflow.</p>
+          <input type="range" id="quarantine_threshold" min="50" max="100" value="70" oninput="handleThresholdChange()" class="cyber-slider mt-2">
+          <div class="flex items-center justify-between text-[10px] font-mono text-slate-500 pt-0.5">
+            <span>50 (Tolerant)</span>
+            <span>75 (Nominal)</span>
+            <span>100 (Strict)</span>
+          </div>
+        </div>
+
+        <!-- Quarantine Backend Selector -->
+        <div class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-2">
+          <label class="font-semibold text-white block">Quarantine Enforcement Target</label>
+          <select id="quarantine_backend" class="w-full bg-[#0F1626] border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 font-medium focus:outline-none focus:border-blue-500 hover:border-slate-600 transition shadow-inner">
+            <option value="SIMULATED" class="bg-[#0F1626] text-slate-200 py-1.5">Simulated Cisco IOS / MikroTik ACL (Safe Lab / Viva Mode)</option>
+            <option value="WINDOWS" class="bg-[#0F1626] text-slate-200 py-1.5">Windows Defender Firewall (netsh advfirewall)</option>
+            <option value="LINUX" class="bg-[#0F1626] text-slate-200 py-1.5">Linux Host / Gateway Firewall (iptables)</option>
+            <option value="PFCTL" class="bg-[#0F1626] text-slate-200 py-1.5">macOS / BSD Packet Filter (pfctl)</option>
+          </select>
+          <p class="text-[11px] text-slate-500">The simulated option is safest for assessment. Host firewall targets require privileges and a controlled environment.</p>
+        </div>
+
+        <!-- Traffic Ingestion Mode -->
+        <div class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-2">
+          <label class="font-semibold text-white block">Network Ingestion Engine</label>
+          <select id="capture_mode" class="w-full bg-[#0F1626] border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 font-medium focus:outline-none focus:border-blue-500 hover:border-slate-600 transition shadow-inner">
+            <option value="LIVE" class="bg-[#0F1626] text-slate-200 py-1.5">Live Physical Network Sniffing (Scapy / Raw Sockets)</option>
+            <option value="SIMULATED" class="bg-[#0F1626] text-slate-200 py-1.5">Synthetic Lab Generator (Controlled Demo Mode)</option>
+          </select>
+          <p class="text-[11px] text-slate-500">Source of Layer 3/4 packet streams and telemetry. Restart NetGuard after changing this setting.</p>
+        </div>
+
+        <!-- Autonomous Quarantine Toggle Switch -->
+        <div class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80 flex items-center justify-between">
+          <div>
+            <span class="font-semibold text-white block">Automatic quarantine workflow</span>
+            <span class="text-[11px] text-slate-400 block mt-0.5">Run the configured isolation workflow when the risk score reaches T2.</span>
+          </div>
+          <label class="switch shrink-0 ml-3">
+            <input type="checkbox" id="auto_quarantine" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Submit Action -->
+    <div class="flex items-center justify-end space-x-3 pt-2">
+      <button type="submit" class="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition shadow-md shadow-blue-600/30 flex items-center space-x-2">
+        <i class="fa-solid fa-floppy-disk"></i>
+        <span>Save Configuration</span>
+      </button>
+    </div>
+
+  </form>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const SLIDER_CONFIGS = {
+    weight_port_scan: { from: '#06b6d4', to: '#3b82f6', glow: 'rgba(6,182,212,0.7)' },
+    weight_unknown_device: { from: '#f43f5e', to: '#e11d48', glow: 'rgba(244,63,94,0.7)' },
+    weight_dns_anomaly: { from: '#0ea5e9', to: '#06b6d4', glow: 'rgba(14,165,233,0.7)' },
+    weight_traffic_spike: { from: '#f59e0b', to: '#ea580c', glow: 'rgba(245,158,11,0.7)' },
+    weight_unfamiliar_dest: { from: '#a855f7', to: '#7c3aed', glow: 'rgba(168,85,247,0.7)' },
+    quarantine_threshold: { from: '#f43f5e', to: '#e11d48', glow: 'rgba(244,63,94,0.7)' }
+  };
+
+  function updateSliderVisual(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const min = parseFloat(el.min) || 0;
+    const max = parseFloat(el.max) || 100;
+    const val = parseFloat(el.value) || 0;
+    const pct = Math.max(0, Math.min(100, ((val - min) / (max - min)) * 100));
+    const cfg = SLIDER_CONFIGS[id] || { from: '#06b6d4', to: '#3b82f6', glow: 'rgba(6,182,212,0.7)' };
+
+    el.style.background = `linear-gradient(to right, ${cfg.from} 0%, ${cfg.to} ${pct}%, #162033 ${pct}%, #162033 100%)`;
+    el.style.setProperty('--slider-thumb-border', cfg.to);
+    el.style.setProperty('--slider-thumb-glow', cfg.glow);
+  }
+
+  function handleWeightChange(key) {
+    const id = `weight_${key}`;
+    const val = parseInt(document.getElementById(id).value) || 0;
+    const badge = document.getElementById(`badge_${key}`);
+    if (badge) badge.innerText = `+${val} pts`;
+    updateSliderVisual(id);
+    updateWeightsTotal();
+  }
+
+  function handleThresholdChange() {
+    const el = document.getElementById('quarantine_threshold');
+    const val = parseInt(el.value) || 70;
+    const badge = document.getElementById('badge_quarantine_thresh');
+    if (badge) badge.innerText = `≥ ${val} Risk`;
+    updateSliderVisual('quarantine_threshold');
+  }
+
+  function updateWeightsTotal() {
+    const p = parseInt(document.getElementById('weight_port_scan').value) || 0;
+    const u = parseInt(document.getElementById('weight_unknown_device').value) || 0;
+    const d = parseInt(document.getElementById('weight_dns_anomaly').value) || 0;
+    const t = parseInt(document.getElementById('weight_traffic_spike').value) || 0;
+    const f = parseInt(document.getElementById('weight_unfamiliar_dest').value) || 0;
+    const total = p + u + d + t + f;
+    const display = document.getElementById('total-weights-display');
+
+    if (display) {
+      display.innerText = `Total: ${total} / 100`;
+      if (total === 100) {
+        display.className = 'px-3 py-1 rounded-lg bg-emerald-950/80 border border-emerald-800/50 text-xs font-mono font-bold text-emerald-400';
+      } else {
+        display.className = 'px-3 py-1 rounded-lg bg-amber-950/80 border border-amber-800/50 text-xs font-mono font-bold text-amber-400';
+      }
+    }
+  }
+
+  function resetDefaults() {
+    document.getElementById('weight_port_scan').value = 30;
+    document.getElementById('weight_unknown_device').value = 20;
+    document.getElementById('weight_dns_anomaly').value = 20;
+    document.getElementById('weight_traffic_spike').value = 15;
+    document.getElementById('weight_unfamiliar_dest').value = 15;
+    document.getElementById('quarantine_threshold').value = 70;
+
+    ['port_scan', 'unknown_device', 'dns_anomaly', 'traffic_spike', 'unfamiliar_dest'].forEach(k => handleWeightChange(k));
+    handleThresholdChange();
+    showToast('Reset parameters to Proposal Section 8.3 defaults', 'success');
+  }
+
+  async function loadSettings() {
+    try {
+      const res = await fetch('/api/settings');
+      const data = await res.json();
+      if (data.settings) {
+        const s = data.settings;
+        if (s.weight_port_scan) document.getElementById('weight_port_scan').value = s.weight_port_scan;
+        if (s.weight_unknown_device) document.getElementById('weight_unknown_device').value = s.weight_unknown_device;
+        if (s.weight_dns_anomaly) document.getElementById('weight_dns_anomaly').value = s.weight_dns_anomaly;
+        if (s.weight_traffic_spike) document.getElementById('weight_traffic_spike').value = s.weight_traffic_spike;
+        if (s.weight_unfamiliar_dest) document.getElementById('weight_unfamiliar_dest').value = s.weight_unfamiliar_dest;
+        if (s.quarantine_threshold) document.getElementById('quarantine_threshold').value = s.quarantine_threshold;
+        if (s.quarantine_backend) document.getElementById('quarantine_backend').value = s.quarantine_backend;
+        if (s.capture_mode) document.getElementById('capture_mode').value = s.capture_mode;
+        if (s.auto_quarantine !== undefined) document.getElementById('auto_quarantine').checked = (s.auto_quarantine === 'true');
+
+        ['port_scan', 'unknown_device', 'dns_anomaly', 'traffic_spike', 'unfamiliar_dest'].forEach(k => handleWeightChange(k));
+        handleThresholdChange();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function saveSettings(e) {
+    e.preventDefault();
+    const payload = {
+      weight_port_scan: document.getElementById('weight_port_scan').value,
+      weight_unknown_device: document.getElementById('weight_unknown_device').value,
+      weight_dns_anomaly: document.getElementById('weight_dns_anomaly').value,
+      weight_traffic_spike: document.getElementById('weight_traffic_spike').value,
+      weight_unfamiliar_dest: document.getElementById('weight_unfamiliar_dest').value,
+      quarantine_threshold: document.getElementById('quarantine_threshold').value,
+      quarantine_backend: document.getElementById('quarantine_backend').value,
+      capture_mode: document.getElementById('capture_mode').value,
+      auto_quarantine: document.getElementById('auto_quarantine').checked ? 'true' : 'false'
+    };
+
+    const total = Object.entries(payload)
+      .filter(([key]) => key.startsWith('weight_'))
+      .reduce((sum, [, value]) => sum + (parseInt(value, 10) || 0), 0);
+    if (total > 100) {
+      showToast('Risk weights must total 100 points or fewer', 'warning');
+      return;
+    }
+    if (payload.quarantine_backend !== 'SIMULATED' && !confirm('This can run firewall commands on the host. Confirm you are authorised and using a controlled environment.')) {
+      return;
+    }
+    payload.authorization_confirmed = payload.quarantine_backend !== 'SIMULATED';
+
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const result = await res.json();
+      if (result.status === 'success') {
+        showToast(result.message || 'Configuration updated successfully', 'success');
+      } else {
+        showToast(result.message || 'Failed to save settings', 'error');
+      }
+    } catch (err) {
+      showToast('Error saving settings', 'error');
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    ['port_scan', 'unknown_device', 'dns_anomaly', 'traffic_spike', 'unfamiliar_dest'].forEach(k => handleWeightChange(k));
+    handleThresholdChange();
+    loadSettings();
+  });
+</script>
+{% endblock %}

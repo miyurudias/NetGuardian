@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+{% set active_page = "dashboard" %}
+
+{% block title %}Enterprise Dashboard | NetGuard Behavioral Security{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Active Environment Header Banner -->
+  <div class="cyber-card surface-header p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-slate-800 bg-[#0F1626]">
+    <div class="flex items-center space-x-3.5">
+      <div class="w-9 h-9 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-blue-400">
+        <i class="fa-solid fa-network-wired text-sm"></i>
+      </div>
+      <div>
+        <div class="flex items-center space-x-2">
+          <h2 class="text-sm font-bold text-white tracking-wide" id="active-env-title">Academic demonstration lab</h2>
+          <span id="active-mode-badge" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-800/50">
+            SIMULATED DATA
+          </span>
+        </div>
+        <p class="text-xs text-slate-400 mt-0.5" id="active-env-subtitle">
+          Synthetic traffic is being evaluated against seeded device baselines. Switch to Live LAN only on an authorised network.
+        </p>
+      </div>
+    </div>
+
+    <!-- Quick Actions Group -->
+    <div class="flex items-center space-x-2.5 self-end sm:self-center">
+      <button onclick="openNetworkScanModal()" class="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition flex items-center space-x-1.5 shadow-sm">
+        <i class="fa-solid fa-satellite-dish text-xs"></i>
+        <span>Scan</span>
+      </button>
+      <button onclick="refreshDashboard()" title="Force Refresh Telemetry" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs border border-slate-700 transition">
+        <i class="fa-solid fa-arrows-rotate"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- KPI Metrics Grid (Modern High-Contrast Cards) -->
+  <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 dashboard-metrics">
+    
+    <!-- Total Devices -->
+    <div class="cyber-card metric-card cyber-card-glow-cyan p-4 rounded-2xl flex flex-col justify-between">
+      <div class="flex items-center justify-between">
+        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Endpoints</span>
+        <div class="w-7 h-7 rounded-lg bg-cyan-950/60 border border-cyan-800/40 flex items-center justify-center text-cyan-400">
+          <i class="fa-solid fa-network-wired text-xs"></i>
+        </div>
+      </div>
+      <div class="mt-3">
+        <span id="stat-total-devices" class="text-3xl font-extrabold text-white tracking-tight">0</span>
+        <div class="flex items-center justify-between mt-1 text-[11px] text-slate-400">
+          <span>LAN Devices</span>
+          <span class="text-cyan-400 font-mono">100% Monitored</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Normal (Low Risk) -->
+    <div class="cyber-card metric-card cyber-card-glow-emerald p-4 rounded-2xl flex flex-col justify-between border-t-2 border-t-emerald-500">
+      <div class="flex items-center justify-between">
+        <span class="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">Normal</span>
+        <div class="w-7 h-7 rounded-lg bg-emerald-950/60 border border-emerald-800/40 flex items-center justify-center text-emerald-400">
+          <i class="fa-solid fa-circle-check text-xs"></i>
+        </div>
+      </div>
+      <div class="mt-3">
+        <span id="stat-normal-devices" class="text-3xl font-extrabold text-emerald-400 tracking-tight">0</span>
+        <div class="flex items-center justify-between mt-1 text-[11px] text-slate-400">
+          <span>Within threshold</span>
+          <span class="text-emerald-400 font-mono">Within Baseline</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Suspicious (Medium Risk) -->
+    <div class="cyber-card metric-card cyber-card-glow-amber p-4 rounded-2xl flex flex-col justify-between border-t-2 border-t-amber-500">
+      <div class="flex items-center justify-between">
+        <span class="text-[11px] font-bold text-amber-400 uppercase tracking-wider">Suspicious</span>
+        <div class="w-7 h-7 rounded-lg bg-amber-950/60 border border-amber-800/40 flex items-center justify-center text-amber-400">
+          <i class="fa-solid fa-triangle-exclamation text-xs"></i>
+        </div>
+      </div>
+      <div class="mt-3">
+        <span id="stat-suspicious-devices" class="text-3xl font-extrabold text-amber-400 tracking-tight">0</span>
+        <div class="flex items-center justify-between mt-1 text-[11px] text-slate-400">
+          <span>Review required</span>
+          <span class="text-amber-400 font-mono">Flagged</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Critical (High Risk) -->
+    <div class="cyber-card metric-card cyber-card-glow-rose p-4 rounded-2xl flex flex-col justify-between border-t-2 border-t-rose-500">
+      <div class="flex items-center justify-between">
+        <span class="text-[11px] font-bold text-rose-400 uppercase tracking-wider">Critical</span>
+        <div class="w-7 h-7 rounded-lg bg-rose-950/60 border border-rose-800/40 flex items-center justify-center text-rose-400">
+          <i class="fa-solid fa-radiation text-xs"></i>
+        </div>
+      </div>
+      <div class="mt-3">
+        <span id="stat-critical-devices" class="text-3xl font-extrabold text-rose-400 tracking-tight">0</span>
+        <div class="flex items-center justify-between mt-1 text-[11px] text-slate-400">
+          <span>Threshold breached</span>
+          <span class="text-rose-400 font-mono">Threat Alert</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quarantined / Blocked -->
+    <div class="cyber-card metric-card p-4 rounded-2xl flex flex-col justify-between border-t-2 border-t-red-600">
+      <div class="flex items-center justify-between">
+        <span class="text-[11px] font-bold text-red-400 uppercase tracking-wider">Quarantined</span>
+        <div class="w-7 h-7 rounded-lg bg-red-950/80 border border-red-800/50 flex items-center justify-center text-red-400">
+          <i class="fa-solid fa-shield-virus text-xs"></i>
+        </div>
+      </div>
+      <div class="mt-3">
+        <span id="stat-quarantined-devices" class="text-3xl font-extrabold text-red-400 tracking-tight">0</span>
+        <div class="flex items-center justify-between mt-1 text-[11px] text-slate-400">
+          <span>Automated ACL</span>
+          <span class="text-red-400 font-mono">ISOLATED</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Incident Alerts -->
+    <div class="cyber-card metric-card p-4 rounded-2xl flex flex-col justify-between border-t-2 border-t-indigo-500">
+      <div class="flex items-center justify-between">
+        <span class="text-[11px] font-bold text-indigo-400 uppercase tracking-wider">Alerts</span>
+        <div class="w-7 h-7 rounded-lg bg-indigo-950/60 border border-indigo-800/40 flex items-center justify-center text-indigo-400">
+          <i class="fa-solid fa-bell text-xs"></i>
+        </div>
+      </div>
+      <div class="mt-3">
+        <span id="stat-active-alerts" class="text-3xl font-extrabold text-indigo-300 tracking-tight">0</span>
+        <div class="flex items-center justify-between mt-1 text-[11px] text-slate-400">
+          <span>Active Events</span>
+          <span class="text-indigo-400 font-mono">Real-time</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Threat Analytics & Security Event Stream -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    
+    <!-- Redesigned Peak Threat Gauge Card -->
+    <div class="cyber-card p-6 rounded-2xl flex flex-col items-center justify-between relative overflow-hidden bg-[#0F1626]">
+      <div class="w-full flex items-center justify-between mb-2">
+        <div class="flex items-center space-x-2">
+          <i class="fa-solid fa-gauge-high text-blue-400"></i>
+          <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Network Threat Index</h3>
+        </div>
+        <span id="gauge-band-label" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider badge-low">
+          LOW - SECURE
+        </span>
+      </div>
+
+      <!-- Threat Arc Container -->
+      <div class="relative w-56 h-48 flex items-center justify-center my-2">
+        <canvas id="threatGaugeChart"></canvas>
+        <div class="absolute flex flex-col items-center justify-center -mb-4">
+          <span id="gauge-score-value" class="text-4xl font-black text-white tracking-tight">0</span>
+          <span class="text-[10px] font-mono text-slate-400 uppercase">Risk Level / 100</span>
+        </div>
+      </div>
+
+      <!-- Threat Gauge Sub-Metrics -->
+      <div class="w-full grid grid-cols-2 gap-2 pt-3 border-t border-slate-800/80 text-[11px]">
+        <div class="bg-slate-900/50 p-2.5 rounded-xl border border-slate-800/60">
+          <span class="text-slate-400 block text-[10px]">Highest Drift Host:</span>
+          <span id="gauge-highest-host" class="text-white font-semibold truncate block mt-0.5">None (0.0%)</span>
+        </div>
+        <div class="bg-slate-900/50 p-2.5 rounded-xl border border-slate-800/60">
+          <span class="text-slate-400 block text-[10px]">Active Enforcement:</span>
+          <span id="gauge-enforce-mode" class="text-cyan-400 font-mono font-bold block mt-0.5">Simulated ACL policy</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Redesigned Live Event Stream -->
+    <div class="cyber-card p-6 rounded-2xl lg:col-span-2 flex flex-col bg-[#0F1626]">
+      <div class="flex items-center justify-between mb-4 border-b border-slate-800/80 pb-3">
+        <div class="flex items-center space-x-2.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse"></span>
+          <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider">Live Security Event Stream</h3>
+        </div>
+        <div class="flex items-center space-x-2 text-xs">
+          <a href="/alerts" class="text-blue-400 hover:text-blue-300 font-semibold hover:underline flex items-center">
+            <span>Incident Center</span>
+            <i class="fa-solid fa-arrow-right text-[10px] ml-1"></i>
+          </a>
+        </div>
+      </div>
+      
+      <!-- Live Incident Timeline -->
+      <div id="live-alert-feed" class="flex-1 overflow-y-auto max-h-60 space-y-2.5 pr-1 flex flex-col justify-center">
+        <div class="py-8 px-4 flex flex-col items-center justify-center text-center space-y-2.5">
+          <div class="w-12 h-12 rounded-xl bg-emerald-950/70 border border-emerald-500/30 flex items-center justify-center shadow-lg shadow-emerald-950/40 ring-1 ring-emerald-500/20">
+            <svg class="w-6 h-6 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              <path d="m9 12 2 2 4-4"/>
+            </svg>
+          </div>
+          <div>
+            <h4 class="text-xs font-bold text-white tracking-wide">No current anomalies</h4>
+            <p class="text-[11px] text-slate-400 mt-1 max-w-sm leading-relaxed">
+              Current sample data is within the configured behavioural thresholds. New detections will appear here.
+            </p>
+          </div>
+          <div class="flex items-center space-x-2 pt-1 text-[10px] font-mono text-slate-500">
+            <span class="inline-flex items-center text-emerald-400 font-semibold"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 animate-pulse"></span>Standing By</span>
+            <span>&bull;</span>
+            <span>Threshold T1=40 / T2=70</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Redesigned Monitored Network Devices Inventory -->
+  <div class="cyber-card rounded-2xl overflow-hidden border border-slate-800 bg-[#0F1626]">
+    <div class="p-5 border-b border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-slate-900/40">
+      <div>
+        <div class="flex items-center space-x-2">
+          <h2 class="text-base font-bold text-white">Monitored Network Devices</h2>
+          <span id="device-count-pill" class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-800 text-slate-300 border border-slate-700">
+            0 Active
+          </span>
+        </div>
+        <p class="text-xs text-slate-400 mt-0.5">Per-device baseline tracking, risk context, and reviewed containment actions</p>
+      </div>
+
+      <!-- Controls & Search Toolbar -->
+      <div class="flex flex-wrap items-center gap-2.5">
+        <div class="relative">
+          <input type="text" id="device-search-input" placeholder="Search IP, MAC or Name..." 
+                 class="bg-slate-900/90 border border-slate-700/80 rounded-xl px-3.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 w-52 sm:w-64 transition">
+          <i class="fa-solid fa-magnifying-glass absolute right-3 top-2.5 text-xs text-slate-500"></i>
+        </div>
+
+        <select id="category-filter" class="bg-slate-900/90 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-blue-500">
+          <option value="ALL">All Categories</option>
+          <option value="Router">Routers / Gateways</option>
+          <option value="Laptop">Laptops & PCs</option>
+          <option value="Phone">Smartphones</option>
+          <option value="Printer">Printers</option>
+          <option value="CCTV">CCTV & Cameras</option>
+          <option value="Unknown">Unknown Hardware</option>
+        </select>
+
+        <select id="status-filter" class="bg-slate-900/90 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-blue-500">
+          <option value="ALL">All Statuses</option>
+          <option value="Normal">Normal</option>
+          <option value="Suspicious">Suspicious</option>
+          <option value="Critical">Critical</option>
+          <option value="Quarantined">Quarantined</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Inventory Table Container -->
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-950/60 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800 text-[11px]">
+          <tr>
+            <th class="py-3 px-4">Hardware & Vendor</th>
+            <th class="py-3 px-4">IP & MAC Address</th>
+            <th class="py-3 px-4">Category</th>
+            <th class="py-3 px-4">Live Latency</th>
+            <th class="py-3 px-4">Behavior Drift</th>
+            <th class="py-3 px-4">Risk Score</th>
+            <th class="py-3 px-4">Status</th>
+            <th class="py-3 px-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="device-table-body" class="divide-y divide-slate-800/50">
+          <!-- Populated dynamically via JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/charts.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    initDashboard();
+  });
+</script>
+{% endblock %}

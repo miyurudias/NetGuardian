@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}NetGuard | Behavioural Network Monitor{% endblock %}</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome 6 Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Custom NetGuard Design System -->
+  <link rel="stylesheet" href="/static/css/styles.css">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            cyberDark: '#060913',
+            cyberCard: '#0d1222',
+            cyberBorder: 'rgba(255, 255, 255, 0.08)',
+            accentCyan: '#06b6d4',
+            riskLow: '#10b981',
+            riskMedium: '#f59e0b',
+            riskHigh: '#f43f5e'
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-cyan-500/30 selection:text-cyan-200">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <!-- Top Professional Navigation Bar -->
+  <header class="app-header border-b border-slate-800 bg-[#0B0F17]/90 backdrop-blur-xl sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-16 py-2 flex items-center justify-between gap-4">
+      
+      <!-- Brand Identity with Vertical Separator | -->
+      <div class="flex items-center space-x-3">
+        <a href="/" class="flex items-center space-x-3 group">
+          <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-sm shadow-blue-500/20">
+            <i class="fa-solid fa-shield-halved text-sm"></i>
+          </div>
+          <!-- Vertical Separator | -->
+          <div class="h-4 w-[1px] bg-slate-700"></div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="text-base font-bold tracking-tight text-white group-hover:text-blue-400 transition-colors">NetGuard</span>
+              <span class="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">LAB</span>
+            </div>
+            <p class="text-[10px] text-slate-500 hidden sm:block">Network Threat & Quarantine Platform</p>
+          </div>
+        </a>
+      </div>
+
+      <!-- Core Functional Navigation (Icon by default; reveals text on hover or when active) -->
+      <nav aria-label="Primary navigation" class="hidden md:flex items-center space-x-1 text-xs">
+        
+        <!-- Dashboard -->
+        <a href="/" {% if active_page == 'dashboard' %}aria-current="page"{% endif %} 
+           class="group flex items-center {% if active_page == 'dashboard' %}px-3 py-1.5 bg-slate-800 text-white font-semibold border border-slate-700 shadow-sm{% else %}px-2.5 py-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent hover:border-slate-700/60{% endif %} rounded-lg transition-all duration-200" title="Dashboard">
+          <i class="fa-solid fa-gauge text-sm {% if active_page == 'dashboard' %}text-cyan-400{% else %}text-slate-400 group-hover:text-cyan-400{% endif %} transition-colors"></i>
+          <span class="{% if active_page == 'dashboard' %}ml-2 block{% else %}max-w-0 overflow-hidden opacity-0 group-hover:max-w-xs group-hover:opacity-100 group-hover:ml-2 transition-all duration-200 ease-out whitespace-nowrap font-medium{% endif %}">Dashboard</span>
+        </a>
+
+        <!-- Endpoints -->
+        <a href="/devices" {% if active_page == 'devices' %}aria-current="page"{% endif %} 
+           class="group flex items-center {% if active_page == 'devices' %}px-3 py-1.5 bg-slate-800 text-white font-semibold border border-slate-700 shadow-sm{% else %}px-2.5 py-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent hover:border-slate-700/60{% endif %} rounded-lg transition-all duration-200" title="Endpoints Inventory">
+          <i class="fa-solid fa-network-wired text-sm {% if active_page == 'devices' %}text-cyan-400{% else %}text-slate-400 group-hover:text-cyan-400{% endif %} transition-colors"></i>
+          <span class="{% if active_page == 'devices' %}ml-2 block{% else %}max-w-0 overflow-hidden opacity-0 group-hover:max-w-xs group-hover:opacity-100 group-hover:ml-2 transition-all duration-200 ease-out whitespace-nowrap font-medium{% endif %}">Endpoints</span>
+        </a>
+
+        <!-- Alerts -->
+        <a href="/alerts" {% if active_page == 'alerts' %}aria-current="page"{% endif %} 
+           class="group flex items-center relative {% if active_page == 'alerts' %}px-3 py-1.5 bg-slate-800 text-white font-semibold border border-slate-700 shadow-sm{% else %}px-2.5 py-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent hover:border-slate-700/60{% endif %} rounded-lg transition-all duration-200" title="Security Incidents & Alerts">
+          <i class="fa-solid fa-bell text-sm {% if active_page == 'alerts' %}text-rose-400{% else %}text-slate-400 group-hover:text-rose-400{% endif %} transition-colors"></i>
+          <span class="{% if active_page == 'alerts' %}ml-2 block{% else %}max-w-0 overflow-hidden opacity-0 group-hover:max-w-xs group-hover:opacity-100 group-hover:ml-2 transition-all duration-200 ease-out whitespace-nowrap font-medium{% endif %}">Alerts</span>
+          <span id="nav-alert-badge" class="hidden ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-rose-600 text-white font-bold">0</span>
+        </a>
+
+        <!-- Quarantine -->
+        <a href="/quarantine" {% if active_page == 'quarantine' %}aria-current="page"{% endif %} 
+           class="group flex items-center relative {% if active_page == 'quarantine' %}px-3 py-1.5 bg-slate-800 text-white font-semibold border border-slate-700 shadow-sm{% else %}px-2.5 py-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent hover:border-slate-700/60{% endif %} rounded-lg transition-all duration-200" title="Quarantine & Containment Chamber">
+          <i class="fa-solid fa-ban text-sm {% if active_page == 'quarantine' %}text-amber-400{% else %}text-slate-400 group-hover:text-amber-400{% endif %} transition-colors"></i>
+          <span class="{% if active_page == 'quarantine' %}ml-2 block{% else %}max-w-0 overflow-hidden opacity-0 group-hover:max-w-xs group-hover:opacity-100 group-hover:ml-2 transition-all duration-200 ease-out whitespace-nowrap font-medium{% endif %}">Quarantine</span>
+          <span id="nav-quarantine-badge" class="hidden ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-amber-600 text-white font-bold">0</span>
+        </a>
+
+        <!-- Settings -->
+        <a href="/settings" {% if active_page == 'settings' %}aria-current="page"{% endif %} 
+           class="group flex items-center {% if active_page == 'settings' %}px-3 py-1.5 bg-slate-800 text-white font-semibold border border-slate-700 shadow-sm{% else %}px-2.5 py-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent hover:border-slate-700/60{% endif %} rounded-lg transition-all duration-200" title="Indicator Settings">
+          <i class="fa-solid fa-sliders text-sm {% if active_page == 'settings' %}text-cyan-400{% else %}text-slate-400 group-hover:text-cyan-400{% endif %} transition-colors"></i>
+          <span class="{% if active_page == 'settings' %}ml-2 block{% else %}max-w-0 overflow-hidden opacity-0 group-hover:max-w-xs group-hover:opacity-100 group-hover:ml-2 transition-all duration-200 ease-out whitespace-nowrap font-medium{% endif %}">Settings</span>
+        </a>
+
+      </nav>
+
+      <!-- Actions: Scan Button & Academic Suite Link -->
+      <div class="flex items-center space-x-2">
+        
+        <!-- Scan Button with Satellite Dish / Radar Icon -->
+        <button onclick="openNetworkScanModal()" class="h-9 px-3.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition inline-flex items-center space-x-1.5 shadow-sm" title="Scan local subnet for devices">
+          <i class="fa-solid fa-satellite-dish text-cyan-400 text-xs"></i>
+          <span>Scan</span>
+        </button>
+
+        <!-- Academic Suite Portal Link -->
+        <a href="/academic" {% if active_page == 'academic' %}aria-current="page"{% endif %} class="h-9 px-3.5 rounded-lg text-xs font-semibold transition inline-flex items-center space-x-1.5 {% if active_page == 'academic' %}bg-indigo-900/90 text-indigo-200 border border-indigo-500 shadow-sm{% else %}bg-indigo-950/60 hover:bg-indigo-900/60 text-indigo-300 border border-indigo-800/60{% endif %}" title="Cardiff Met / ICBT University Viva Deck & Empirical Evaluation">
+          <i class="fa-solid fa-graduation-cap text-indigo-400"></i>
+          <span>Academic Suite</span>
+        </a>
+
+      </div>
+
+    </div>
+
+    <!-- Mobile Navigation Bar -->
+    <div class="flex md:hidden items-center justify-around border-t border-slate-800/80 px-2 py-1.5 bg-[#080C14] text-[11px] overflow-x-auto gap-1">
+      <a href="/" class="px-2.5 py-1 rounded-md transition {% if active_page == 'dashboard' %}bg-slate-800 text-white font-semibold{% else %}text-slate-400{% endif %}">
+        <i class="fa-solid fa-gauge mr-1"></i> Dash
+      </a>
+      <a href="/devices" class="px-2.5 py-1 rounded-md transition {% if active_page == 'devices' %}bg-slate-800 text-white font-semibold{% else %}text-slate-400{% endif %}">
+        <i class="fa-solid fa-network-wired mr-1"></i> Endpoints
+      </a>
+      <a href="/alerts" class="px-2.5 py-1 rounded-md transition relative {% if active_page == 'alerts' %}bg-slate-800 text-white font-semibold{% else %}text-slate-400{% endif %}">
+        <i class="fa-solid fa-bell mr-1"></i> Alerts
+      </a>
+      <a href="/quarantine" class="px-2.5 py-1 rounded-md transition relative {% if active_page == 'quarantine' %}bg-slate-800 text-white font-semibold{% else %}text-slate-400{% endif %}">
+        <i class="fa-solid fa-ban mr-1"></i> Quarantine
+      </a>
+      <a href="/settings" class="px-2.5 py-1 rounded-md transition {% if active_page == 'settings' %}bg-slate-800 text-white font-semibold{% else %}text-slate-400{% endif %}">
+        <i class="fa-solid fa-sliders mr-1"></i> Settings
+      </a>
+    </div>
+  </header>
+
+  <!-- Network Discovery Modal -->
+  <div id="network-scan-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="cyber-card rounded-2xl max-w-2xl w-full p-6 space-y-5 border border-slate-700/80 shadow-2xl relative">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center space-x-3">
+          <div class="w-9 h-9 rounded-lg bg-cyan-950/80 border border-cyan-800/60 flex items-center justify-center text-cyan-400">
+            <i id="modal-radar-icon" class="fa-solid fa-satellite-dish text-base"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white">LAN Discovery & Scanner</h3>
+            <p class="text-xs text-slate-400" id="modal-scan-subtitle">Active multi-vector subnet discovery & hardware profiling.</p>
+          </div>
+        </div>
+        <button onclick="closeNetworkScanModal()" class="text-slate-400 hover:text-white text-base">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Live LAN Interface Details -->
+      <div class="grid grid-cols-3 gap-3 p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs">
+        <div>
+          <span class="text-slate-500 block text-[10px] uppercase font-bold">Subnet Range</span>
+          <span id="modal-scan-subnet" class="font-mono text-slate-200 font-semibold">192.168.1.0/24</span>
+        </div>
+        <div>
+          <span class="text-slate-500 block text-[10px] uppercase font-bold">Default Gateway</span>
+          <span id="modal-scan-gateway" class="font-mono text-slate-200 font-semibold">192.168.1.1</span>
+        </div>
+        <div>
+          <span class="text-slate-500 block text-[10px] uppercase font-bold">Network Interface</span>
+          <span id="modal-scan-iface" class="font-mono text-cyan-400 font-bold">en0</span>
+        </div>
+      </div>
+
+      <!-- Direct Single-IP Probe Bar -->
+      <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
+        <label for="direct-probe-ip" class="text-[11px] font-semibold text-slate-300 flex items-center justify-between">
+          <span>Target IP Direct Probe (Instant WiFi Device Wake-up)</span>
+          <span class="text-[10px] text-slate-500 font-normal">Wakes iPhone, TV, Android & IoT</span>
+        </label>
+        <div class="flex items-center space-x-2">
+          <input type="text" id="direct-probe-ip" placeholder="e.g. 192.168.1.80" 
+                 class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 font-mono focus:border-cyan-500 focus:outline-none"
+                 onkeydown="if(event.key==='Enter') probeSingleTargetIp()">
+          <button type="button" id="btn-probe-ip" onclick="probeSingleTargetIp()" class="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold transition flex items-center space-x-1">
+            <i class="fa-solid fa-crosshairs text-xs"></i>
+            <span>Probe IP</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Legal & Ethical Authorization Checkbox -->
+      <div class="p-3 rounded-xl bg-blue-950/20 border border-blue-900/40 text-xs space-y-2">
+        <label class="flex items-start space-x-2.5 cursor-pointer">
+          <input type="checkbox" id="scan-auth-checkbox" checked class="mt-0.5 rounded bg-slate-900 border-slate-700 text-cyan-500 focus:ring-0">
+          <span class="text-slate-300 text-[11px] leading-relaxed">
+            I confirm I am the network administrator or have explicit authorization to perform ARP sweeps and device enumeration on this subnet (Academic Compliance Rule CNT 5015).
+          </span>
+        </label>
+      </div>
+
+      <!-- Scan Progress Indicator -->
+      <div id="scan-progress-box" class="hidden space-y-2">
+        <div class="flex justify-between text-xs text-slate-400">
+          <span id="scan-status-text">Probing active IP addresses across /24 subnet...</span>
+          <span id="scan-status-pct" class="font-mono text-cyan-400">0%</span>
+        </div>
+        <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+          <div id="scan-progress-bar" class="bg-gradient-to-r from-cyan-500 to-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- Discovered Devices List -->
+      <div id="scan-results-container" class="space-y-2 max-h-60 overflow-y-auto pr-1">
+        <div class="text-center py-6 text-slate-500 text-xs" id="scan-empty-state">
+          <div class="w-10 h-10 mx-auto rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-cyan-400 mb-2">
+            <i class="fa-solid fa-satellite-dish text-cyan-400 text-lg"></i>
+          </div>
+          No sweep executed yet. Click "Start Network Sweep" below to scan the active subnet.
+        </div>
+        <div id="discovered-devices-list" class="space-y-1.5"></div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex items-center justify-between pt-3 border-t border-slate-800">
+        <div class="text-xs text-slate-400 font-mono" id="scan-summary-counter">
+          Ready to sweep /24 subnet
+        </div>
+        <div class="flex items-center space-x-2">
+          <button onclick="closeNetworkScanModal()" class="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition">
+            Close
+          </button>
+          <button id="btn-start-scan" onclick="startNetworkScan()" class="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition flex items-center space-x-1.5 shadow-sm shadow-blue-500/20">
+            <i class="fa-solid fa-satellite-dish text-xs"></i>
+            <span>Start Network Sweep</span>
+          </button>
+          <button id="btn-import-scan" onclick="importScannedDevices()" class="hidden px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition flex items-center space-x-1.5 shadow-sm shadow-emerald-500/20">
+            <i class="fa-solid fa-check text-xs"></i>
+            <span>Import All Devices</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Floating LAN Posture Widget (Bottom-Right, Expands on Hover or Click) -->
+  <aside id="floating-lan-widget" aria-label="Local network status" class="fixed bottom-5 right-5 z-40 group select-none">
+    <div id="floating-lan-card" 
+         onclick="toggleFloatingLan(event)" 
+         class="cursor-pointer rounded-full border border-slate-700/80 bg-[#0B101B]/95 hover:border-cyan-500/50 hover:bg-[#0D1424] backdrop-blur-xl shadow-2xl px-3.5 py-1.5 flex items-center transition-all duration-200 group-hover:rounded-2xl group-hover:p-3.5 group-[.is-open]:rounded-2xl group-[.is-open]:p-3.5 group-[.is-open]:border-cyan-500/50"
+         title="Click or hover to view LAN telemetry">
+      
+      <!-- Collapsed Indicator Pill (Ultra-compact: exactly ~36px height) -->
+      <div class="flex items-center space-x-2">
+        <span class="relative flex h-2 w-2">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+        </span>
+        <div class="w-6 h-6 rounded-md bg-cyan-950/80 border border-cyan-800/60 flex items-center justify-center text-cyan-400 text-[10px] shadow-inner">
+          <i class="fa-solid fa-network-wired"></i>
+        </div>
+        <div class="flex items-center space-x-1.5 font-mono text-xs font-bold text-slate-200">
+          <span class="text-slate-400 text-[10px] uppercase font-sans tracking-wider">LAN</span>
+          <span id="floating-collapsed-ip" class="text-cyan-400 text-xs font-semibold">192.168.1.85</span>
+        </div>
+        <i class="fa-solid fa-chevron-up text-[9px] text-slate-500 ml-1 transition-transform duration-200 group-hover:rotate-180 group-[.is-open]:rotate-180"></i>
+      </div>
+
+      <!-- Expanded Detailed Telemetry on Hover or Click -->
+      <div id="floating-lan-details" class="hidden group-hover:block group-[.is-open]:block border-l border-slate-800 pl-3.5 ml-3 space-y-1 text-[11px] font-mono">
+        <div class="flex items-center justify-between text-slate-400 gap-5">
+          <span class="text-slate-500 text-[10px] uppercase font-sans font-semibold">Subnet</span>
+          <span id="floating-subnet" class="text-slate-200">192.168.1.0/24</span>
+        </div>
+        <div class="flex items-center justify-between text-slate-400 gap-5">
+          <span class="text-slate-500 text-[10px] uppercase font-sans font-semibold">Gateway</span>
+          <span id="floating-gw-ip" class="text-slate-200">192.168.1.1</span>
+        </div>
+        <div class="flex items-center justify-between text-slate-400 gap-5">
+          <span class="text-slate-500 text-[10px] uppercase font-sans font-semibold">Adapter</span>
+          <span id="floating-iface" class="text-cyan-400 font-bold">en0</span>
+        </div>
+        <div class="flex items-center justify-between text-slate-400 gap-5 pt-1.5 border-t border-slate-800/80 text-[10px]">
+          <span class="text-slate-500 font-sans">Sensor</span>
+          <span class="text-emerald-400 font-semibold flex items-center">
+            <i class="fa-solid fa-shield-halved mr-1 text-[9px]"></i> Passive Defense Active
+          </span>
+        </div>
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- Toast Alerts Container -->
+  <div id="toast-container" class="fixed top-20 right-5 z-50 flex flex-col space-y-2 max-w-sm pointer-events-none"></div>
+
+  <!-- Main Body Content -->
+  <main id="main-content" class="app-main flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Enhanced Multi-Column Enterprise Footer -->
+  <footer class="border-t border-slate-800 bg-[#070A10] text-slate-400 text-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+        
+        <!-- Col 1: Platform Overview -->
+        <div class="space-y-3 md:col-span-1">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center text-white text-xs shadow-sm">
+              <i class="fa-solid fa-shield-halved"></i>
+            </div>
+            <span class="font-bold text-white tracking-tight text-sm">NetGuard Defense</span>
+          </div>
+          <p class="text-[11px] text-slate-500 leading-relaxed">
+            Autonomous Layer 3/4 network behavioral fingerprinting, empirical drift tracking, and automated zero-trust quarantine for small-scale physical LANs.
+          </p>
+          <div class="flex items-center space-x-2 text-[10px] font-mono">
+            <span class="px-2 py-0.5 rounded bg-slate-800 text-cyan-400 border border-slate-700">CNT 5015</span>
+            <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">BSc (Hons) Computing</span>
+          </div>
+        </div>
+
+        <!-- Col 2: Project & Academic Metadata -->
+        <div class="space-y-2.5">
+          <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider">Research Team</h4>
+          <ul class="space-y-1.5 text-[11px] text-slate-400">
+            <li class="flex items-center space-x-1.5">
+              <i class="fa-solid fa-user-gear text-slate-600 text-[10px]"></i>
+              <span><strong>K.P. Miyuru Sandeepa</strong> (Leader / Network)</span>
+            </li>
+            <li class="flex items-center space-x-1.5">
+              <i class="fa-solid fa-shield text-slate-600 text-[10px]"></i>
+              <span><strong>E.H. Harshana Adithya</strong> (Security / Drift)</span>
+            </li>
+            <li class="flex items-center space-x-1.5">
+              <i class="fa-solid fa-desktop text-slate-600 text-[10px]"></i>
+              <span><strong>A. Isara Kanchana</strong> (Platform / Quarantine)</span>
+            </li>
+          </ul>
+          <p class="text-[10px] text-slate-500 pt-1">
+            Cardiff School of Technologies & ICBT Campus Colombo
+          </p>
+        </div>
+
+        <!-- Col 3: System Navigation -->
+        <div class="space-y-2.5">
+          <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider">Platform Modules</h4>
+          <ul class="grid grid-cols-2 gap-x-2 gap-y-1.5 text-[11px]">
+            <li><a href="/" class="hover:text-cyan-400 transition flex items-center space-x-1"><i class="fa-solid fa-gauge text-[10px] text-slate-600"></i><span>Dashboard</span></a></li>
+            <li><a href="/devices" class="hover:text-cyan-400 transition flex items-center space-x-1"><i class="fa-solid fa-network-wired text-[10px] text-slate-600"></i><span>Endpoints</span></a></li>
+            <li><a href="/alerts" class="hover:text-cyan-400 transition flex items-center space-x-1"><i class="fa-solid fa-bell text-[10px] text-slate-600"></i><span>Incidents</span></a></li>
+            <li><a href="/quarantine" class="hover:text-cyan-400 transition flex items-center space-x-1"><i class="fa-solid fa-ban text-[10px] text-slate-600"></i><span>Quarantine</span></a></li>
+            <li><a href="/settings" class="hover:text-cyan-400 transition flex items-center space-x-1"><i class="fa-solid fa-sliders text-[10px] text-slate-600"></i><span>Settings</span></a></li>
+            <li><a href="/academic" class="hover:text-indigo-400 transition flex items-center space-x-1 font-semibold text-indigo-300"><i class="fa-solid fa-graduation-cap text-[10px] text-indigo-400"></i><span>Academic</span></a></li>
+          </ul>
+        </div>
+
+        <!-- Col 4: Operational Defense Posture -->
+        <div class="space-y-2.5">
+          <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider">Detection Engine</h4>
+          <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1.5 text-[11px] font-mono">
+            <div class="flex justify-between items-center">
+              <span class="text-slate-500 font-sans">Model:</span>
+              <span class="text-slate-300">W-EMA Drift (Sec 8.2)</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-slate-500 font-sans">Window:</span>
+              <span class="text-slate-300">10s Sliding Interval</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-slate-500 font-sans">Containment:</span>
+              <span class="text-slate-300">Multi-Platform ACL</span>
+            </div>
+            <div class="flex justify-between items-center pt-1 border-t border-slate-800/80">
+              <span class="text-slate-500 font-sans">Active Posture:</span>
+              <span class="text-emerald-400 font-semibold">● Sensor Active</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Bottom Sub-Bar -->
+      <div class="mt-8 pt-6 border-t border-slate-800/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-slate-500">
+        <div>
+          © 2026 NetGuard Architecture • Cardiff Metropolitan University & ICBT Campus (CNT 5015)
+        </div>
+        <div class="flex items-center space-x-4">
+          <span>Confidential Academic Deliverable</span>
+          <span>•</span>
+          <span class="text-slate-400">All Rights Reserved</span>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Core Dashboard Scripts -->
+  <script src="/static/js/dashboard.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
